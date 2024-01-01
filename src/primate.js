@@ -37,10 +37,4 @@ class Primate {
 
 const primate = new Primate();
 
-export { PrimateController, PrimateService };
-
-export { auth };
-
-export { getRouter, setupRoute };
-
 export default primate;
