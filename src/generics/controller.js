@@ -31,7 +31,8 @@ class PrimateController {
 				})();
 
 			} catch(e) {
-				console.log('error importing service dynamically', e);
+				// Chalk warning
+				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ serviceFileName }" was not found in the services directory.`);
 			}
 		} else this.service = options.service;
 
