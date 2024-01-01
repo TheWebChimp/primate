@@ -5,7 +5,7 @@ import chalk from 'chalk';
 
 //import LogService from '../generics/log.service.js';
 
-class PrimateController {
+export default class PrimateController {
 
 	// Pass the plural and singular name of the model
 	constructor(modelName, options = {}) {
@@ -21,11 +21,11 @@ class PrimateController {
 			try {
 
 				// check that file exists
-				fs.readFileSync(`./services/${ serviceFileName }.service.js`);
+				const file = fs.readFileSync(`./services/${ serviceFileName }.service.js`);
 
 				// import the service dynamically
 				(async () => {
-					const { default: dynamicController } = await import(`../../services/${ serviceFileName }.service.js`);
+					const { default: dynamicController } = await import(`file://${ process.cwd() }/services/${ serviceFileName }.service.js`);
 					this.service = dynamicController;
 					// ...
 				})();
@@ -295,5 +295,3 @@ class PrimateController {
 		}
 	}
 }
-
-export default PrimateController;
