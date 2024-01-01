@@ -13,7 +13,7 @@ async function importRoutes(directory) {
 		if(path.extname(file) !== '.js') continue;
 
 		// Dynamically import the module
-		const { router } = await import(`../routes/${ file }`);
+		const { router } = await import(`../../../../routes/${ file }`);
 
 		// Add the router to the modules object
 		// The key can be the file name or some transformation of it
