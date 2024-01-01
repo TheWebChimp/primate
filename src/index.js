@@ -1,5 +1,3 @@
-function helloWorld() {
-	return 'hello world';
-}
+import primate from './primate.js';
 
-export default helloWorld;
+export default primate;

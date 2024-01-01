@@ -3,6 +3,10 @@ import chalk from 'chalk';
 import getPort from 'get-port';
 
 import { importRoutes, setupRoutes } from './utils.js';
+import PrimateController from './generics/controller.js';
+import PrimateService from './generics/service.js';
+
+import { getRouter, auth, setupRoute } from './route.js';
 
 class Primate {
 	constructor({ routes }) {
@@ -36,5 +40,11 @@ class Primate {
 
 const routes = await importRoutes('./routes');
 const primate = new Primate({ routes });
+
+export { PrimateController, PrimateService };
+
+export { auth };
+
+export { getRouter, setupRoute };
 
 export default primate;

@@ -1,7 +1,6 @@
 import fs from 'fs';
 import express from 'express';
 import path from 'path';
-import primate from './primate.js';
 
 async function importRoutes(directory) {
 	const modules = {};
