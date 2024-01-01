@@ -1,7 +1,7 @@
 import express from 'express';
 import PrimateService from './generics/service.js';
 import PrimateController from './generics/controller.js';
-import auth from 'middlewares/auth.js';
+import auth from './middlewares/auth.js';
 
 const getRouter = () => express.Router()
 
