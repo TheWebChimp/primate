@@ -5,15 +5,21 @@ import path from 'path';
 async function importRoutes(directory) {
 	const modules = {};
 
+	const routersDir = directory;
+
 	// Read all file names in the directory
-	const files = fs.readdirSync(directory);
+	const files = fs.readdirSync(routersDir);
 
 	for(const file of files) {
 		// Skip files that are not JavaScript files
 		if(path.extname(file) !== '.js') continue;
 
+		console.log(`Importing route: ${ file }`);
+
 		// Dynamically import the module
-		const { router } = await import(`../../../../routes/${ file }`);
+		//const { router } = await import(`../../../../routes/${ file }`);
+
+		const { router } = await import(`file://${ process.cwd() }/${ routersDir }/${ file }`);
 
 		// Add the router to the modules object
 		// The key can be the file name or some transformation of it

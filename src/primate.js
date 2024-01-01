@@ -9,16 +9,8 @@ import PrimateService from './generics/service.js';
 import { getRouter, auth, setupRoute } from './route.js';
 
 class Primate {
-	constructor({ routes }) {
+	constructor(config = {}) {
 		this.app = app;
-
-		// Import all routes from the routes directory
-		this.routes = routes;
-
-		if(!!this.routes && typeof this.routes !== 'object') throw new Error('Routes must be an object');
-
-		// Setup all routes
-		if(!!this.routes) setupRoutes(this.routes, this.app);
 	}
 
 	use(...args) { this.app.use(...args); }
@@ -36,10 +28,14 @@ class Primate {
 			console.log(chalk.yellowBright.bgBlack.bold(`Listening on port ${ port }! `));
 		});
 	}
+
+	async routes(routesDir = './routes') {
+		const routes = await importRoutes(routesDir);
+		setupRoutes(routes, primate.app);
+	}
 }
 
-const routes = await importRoutes('./routes');
-const primate = new Primate({ routes });
+const primate = new Primate();
 
 export { PrimateController, PrimateService };
 
