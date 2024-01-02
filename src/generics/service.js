@@ -193,7 +193,7 @@ class PrimateService {
 	}
 
 	// Get -------------------------------------------------------------------------------------------------------------
-	static async get(id, model, query = {}) {
+	static async get(id, model, query = {}, options = {}) {
 
 		const args = {};
 
@@ -222,7 +222,9 @@ class PrimateService {
 		}
 
 		try {
-			return await prisma[model].findUnique(args);
+			let get = await prisma[model].findUnique(args);
+			if(!!options.filterGetItem) get = await options.filterGetItem(get, query);
+			return get;
 
 		} catch(e) {
 			throw e;

@@ -140,9 +140,9 @@ export default class PrimateController {
 			let record;
 
 			try {
-				record = await this.service.get(req.params.id, req.query);
+				record = await this.service.get(req.params.id, req.query, this.options);
 			} catch(e) {
-				record = await PrimateService.get(req.params.id, this.entity, req.query);
+				record = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
 			}
 
 			res.respond({
