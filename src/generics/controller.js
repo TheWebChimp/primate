@@ -55,7 +55,7 @@ export default class PrimateController {
 
 		try {
 			try {
-				const { count, data } = await this.service.all(req.query);
+				const { count, data } = await this.service.all(req.query, this.options);
 				res.respond({
 					data,
 					message: this.modelName + ' retrieved successfully',

@@ -21,8 +21,6 @@ class PrimateService {
 			const modelFields = PrismaOrmObject[model];
 			const relations = modelFields['relations'] || null;
 
-			console.log(relations);
-
 			if(relations) {
 				// iterate over relations
 				for(const [ relation, relationData ] of Object.entries(relations)) {
@@ -31,21 +29,35 @@ class PrimateService {
 							connect: {
 								id: parseInt(data[relationData.field]),
 							},
-						}
+						};
 
 						delete data[relationData.field];
+					}
+
+					if(relationData.type === 'many-to-many' && !!data[relationData.plural]) {
+						// check if the relation is an object
+						if(Array.isArray(data[relationData.plural])) {
+
+							// check if the relation is an array of objects with id
+							if(typeof data[relationData.plural][0] === 'object' && data[relationData.plural][0].hasOwnProperty('id')) {
+
+								data[relationData.plural] = {
+									connect: data[relationData.plural].map((item) => ({ id: parseInt(item.id) })),
+								};
+
+							} else {
+								// check if the relation is an array with plain ids
+								data[relationData.plural] = {
+									connect: data[relationData.plural].map((item) => ({ id: parseInt(item) })),
+								};
+							}
+						}
 					}
 				}
 			}
 
 			// Sanitize data to avoid errors removing the fields that are not in the model
-			for(const [ field, value ] of Object.entries(data)) {
-				if(!PrismaOrmObject[model].hasOwnProperty(field)) {
-					delete data[field];
-					// log a warning
-					console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
-				}
-			}
+			data = this.sanitizeData(data, model);
 
 			// Check if options.upsertRules is set
 			if(options && options.upsertRules) {
@@ -78,6 +90,85 @@ class PrimateService {
 
 		try {
 			data = this.validate(data, 'update');
+
+			// Check relations to see if we need to connect
+			// first get the fields of the model
+			const modelFields = PrismaOrmObject[model];
+			const relations = modelFields['relations'] || null;
+
+			if(relations) {
+				// iterate over relations
+				for(const [ relation, relationData ] of Object.entries(relations)) {
+					if(relationData.type === 'one-to-many' && !!data[relationData.field]) {
+						data[relationData.model] = {
+							connect: {
+								id: parseInt(data[relationData.field]),
+							},
+						};
+
+						delete data[relationData.field];
+					}
+
+					if(relationData.type === 'many-to-many' && !!data[relationData.plural]) {
+						// check if the relation is an array
+						if(Array.isArray(data[relationData.plural])) {
+
+							// get current elements related to the model
+							const entity = await prisma[model].findUnique({
+								where: { id: parseInt(id) },
+								select: {
+									[relationData.plural]: true,
+								},
+							});
+
+							// check if the relation is an array of objects with id
+							if(typeof data[relationData.plural][0] === 'object' && data[relationData.plural][0].hasOwnProperty('id')) {
+
+								// generate a list of the elements that need to be disconnected and connected
+								const elementsToDisconnect = [];
+
+								// compare the elements in the database with the elements sent
+								entity[relationData.plural].forEach(element => {
+									// if the user is not in the users sent, we disconnect it
+									if(!data[relationData.plural].find((e) => e.id === element.id)) {
+										elementsToDisconnect.push({ id: element.id });
+									}
+								});
+
+
+								data[relationData.plural] = {
+									connect: data[relationData.plural].map((item) => ({ id: parseInt(item.id) })),
+								};
+
+								if(elementsToDisconnect.length > 0) data[relationData.plural].disconnect = elementsToDisconnect;
+
+							} else {
+
+								// generate a list of the elements that need to be disconnected and connected
+								const elementsToDisconnect = [];
+
+								// compare the elements in the database with the elements sent
+								entity[relationData.plural].forEach(element => {
+									// if the user is not in the users sent, we disconnect it
+									if(!data[relationData.plural].find((e) => e === element.id)) {
+										elementsToDisconnect.push({ id: element.id });
+									}
+								});
+
+								// check if the relation is an array with plain ids
+								data[relationData.plural] = {
+									connect: data[relationData.plural].map((item) => ({ id: parseInt(item) })),
+								};
+
+								if(elementsToDisconnect.length > 0) data[relationData.plural].disconnect = elementsToDisconnect;
+							}
+						}
+					}
+				}
+			}
+
+			// Sanitize data to avoid errors removing the fields that are not in the model
+			data = this.sanitizeData(data, model);
 
 			return await prisma[model].update({
 				where: { id: parseInt(id) },
@@ -209,6 +300,7 @@ class PrimateService {
 
 		// Get courses under the query
 		try {
+
 			let data = await prisma[model].findMany(args);
 
 			if(!!options.filterResultData) data = await options.filterResultData(data, query);
@@ -263,6 +355,21 @@ class PrimateService {
 	}
 
 	// Other functions -------------------------------------------------------------------------------------------------
+
+	static sanitizeData(data, model) {
+
+		// Sanitize data to avoid errors removing the fields that are not in the model
+		for(const [ field, value ] of Object.entries(data)) {
+			if(!PrismaOrmObject[model].hasOwnProperty(field)) {
+				delete data[field];
+				// log a warning
+				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
+			}
+		}
+
+		return data;
+
+	}
 
 	// Receive router by reference
 	static prepareCrUDAGRoutes(router, model) {
