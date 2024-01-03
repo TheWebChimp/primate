@@ -43,6 +43,7 @@ if(Prisma.dmmf) {
 					obj[model].relations[otherModel] = {
 						type: 'many-to-many',
 						model: otherModel,
+						plural: otherModelPlural
 					};
 
 				}
