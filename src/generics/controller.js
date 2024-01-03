@@ -85,16 +85,12 @@ export default class PrimateController {
 		const options = { ...this.options };
 
 		// add the current user id to the data
-		if(req.user) {
-			options.idUser = req.user.payload.id;
-		}
+		if(req.user) options.idUser = req.user.payload.id;
 
 		try {
 
 			// remove id from body
 			delete req.body.id;
-
-			console.log('this service', this.service);
 
 			try {
 				record = await this.service.create(req.body, options);

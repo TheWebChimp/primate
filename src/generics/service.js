@@ -16,6 +16,37 @@ class PrimateService {
 		try {
 			data = this.validate(data, 'create');
 
+			// Check relations to see if we need to connect
+			// first get the fields of the model
+			const modelFields = PrismaOrmObject[model];
+			const relations = modelFields['relations'] || null;
+
+			console.log(relations);
+
+			if(relations) {
+				// iterate over relations
+				for(const [ relation, relationData ] of Object.entries(relations)) {
+					if(relationData.type === 'one-to-many' && !!data[relationData.field]) {
+						data[relationData.model] = {
+							connect: {
+								id: parseInt(data[relationData.field]),
+							},
+						}
+
+						delete data[relationData.field];
+					}
+				}
+			}
+
+			// Sanitize data to avoid errors removing the fields that are not in the model
+			for(const [ field, value ] of Object.entries(data)) {
+				if(!PrismaOrmObject[model].hasOwnProperty(field)) {
+					delete data[field];
+					// log a warning
+					console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
+				}
+			}
+
 			// Check if options.upsertRules is set
 			if(options && options.upsertRules) {
 				// iterate over the rules
