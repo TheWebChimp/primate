@@ -160,6 +160,7 @@ export default class PrimateController {
 	async update(req, res) {
 
 		const options = {};
+		console.log('this.service', typeof this.service);
 
 		try {
 			// Remove id from body
@@ -168,14 +169,16 @@ export default class PrimateController {
 			let oldRecord;
 			let record;
 
-			if(typeof this.service.get === 'function' || typeof this.service.update === 'function') {
+			try {
+
 				if(typeof this.service.get === 'function') {
 					oldRecord = await this.service.get(req.params.id);
 				} else {
 					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
 				}
 				record = await this.service.update(req.params.id, req.body);
-			} else {
+			} catch(e) {
+				console.log('ENTRANDO', e);
 				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
 				record = await PrimateService.update(req.params.id, req.body, this.entity, options);
 			}
