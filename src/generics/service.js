@@ -329,18 +329,21 @@ class PrimateService {
 
 		// check if we are fetching a relation via query, it would be of type "fetch_[entity]"
 		// check if query has a key that starts with "fetch_"
-		const fetch = Object.keys(query).filter(key => key.startsWith('fetch'))[0];
+		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch'));
+		console.log(fetchs);
 
-		if(fetch) {
-			// remove the "fetch_" part
-			const entity = fetch.replace('fetch-', '');
-			// check if the entity exists
-			if(PrismaOrmObject[model].hasOwnProperty(entity)) {
-				// add the entity to the include
-				args.include = {
-					...args.include,
-					[entity]: true,
-				};
+		if(fetchs) {
+			for(const fetch of fetchs) {
+				// remove the "fetch_" part
+				const entity = fetch.replace('fetch-', '');
+				// check if the entity exists
+				if(PrismaOrmObject[model].hasOwnProperty(entity)) {
+					// add the entity to the include
+					args.include = {
+						...args.include,
+						[entity]: true,
+					};
+				}
 			}
 		}
 
