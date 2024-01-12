@@ -320,7 +320,8 @@ class PrimateService {
 
 		const args = {};
 
-		args.where = PrimateService.resolveWhere(id, model);
+		if(options.resolveWhere) args.where = options.resolveWhere(id, model);
+		else args.where = PrimateService.resolveWhere(id, model);
 
 		// get the "include" parameter from the query
 		let include = query.include || null;
