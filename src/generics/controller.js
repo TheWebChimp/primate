@@ -53,6 +53,9 @@ export default class PrimateController {
 		// check if we are receiving id-workspace in the headers
 		if(headers['id-workspace']) req.query.idWorkspace = headers['id-workspace'];
 
+		// Pass the user to options
+		if(req.user) this.options.user = req.user.payload;
+
 		try {
 			try {
 				const { count, data } = await this.service.all(req.query, this.options);

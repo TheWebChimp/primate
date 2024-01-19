@@ -135,7 +135,6 @@ class PrimateService {
 									}
 								});
 
-
 								data[relationData.plural] = {
 									connect: data[relationData.plural].map((item) => ({ id: parseInt(item.id) })),
 								};
@@ -244,7 +243,10 @@ class PrimateService {
 			...queryObject.where,
 		};
 
-		if(!!options.filterAllQuery) queryObject = await options.filterAllQuery(query, queryObject);
+		if(!!options.filterAllQuery) {
+			const filterAllQueryObject = await options.filterAllQuery(query, queryObject, options);
+			if(filterAllQueryObject) queryObject = filterAllQueryObject;
+		}
 
 		// Get count of all courses under the query
 		const count = await prisma[model].count(queryObject);
@@ -331,7 +333,6 @@ class PrimateService {
 		// check if we are fetching a relation via query, it would be of type "fetch_[entity]"
 		// check if query has a key that starts with "fetch_"
 		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch'));
-		console.log(fetchs);
 
 		if(fetchs) {
 			for(const fetch of fetchs) {
