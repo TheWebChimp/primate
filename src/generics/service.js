@@ -237,6 +237,18 @@ class PrimateService {
 			}
 		}
 
+		// Check if we are receiving a query parameter that is in the fields of the model
+		// if so, add it to the query
+
+		// iterate over the model fields
+		for(const [ field, value ] of Object.entries(PrismaOrmObject[model])) {
+			// check if the query has a field that matches the model field
+			if(query[field]) {
+				// add the field to the query
+				queryObject.where[field] = query[field];
+			}
+		}
+
 		// remove deleted elements
 		queryObject.where = {
 			...options.where || {},
