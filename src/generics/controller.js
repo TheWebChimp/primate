@@ -2,8 +2,7 @@ import createError from 'http-errors';
 import PrimateService from '../generics/service.js';
 import fs from 'fs';
 import chalk from 'chalk';
-
-//import LogService from '../generics/log.service.js';
+import primate from '../primate.js';
 
 export default class PrimateController {
 
@@ -46,6 +45,12 @@ export default class PrimateController {
 
 	// Get all records
 	async all(req, res, next) {
+
+		// hook all globally
+		if(primate.hooks?.all) {
+			primate.hooks.all(req, res, next);
+		}
+
 		// Convert query parameters that look like numbers to integers
 		for (const key in req.query) {
 			if (req.query.hasOwnProperty(key)) {
