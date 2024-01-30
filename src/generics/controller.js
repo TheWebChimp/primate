@@ -46,16 +46,20 @@ export default class PrimateController {
 
 	// Get all records
 	async all(req, res, next) {
-
-		// get headers
-		const headers = req.headers;
-
-		// check if we are receiving id-workspace in the headers
-		if(headers['id-workspace']) req.query.idWorkspace = headers['id-workspace'];
-
-		// Pass the user to options
-		if(req.user) this.options.user = req.user.payload;
-
+		// Convert query parameters that look like numbers to integers
+		for (const key in req.query) {
+			if (req.query.hasOwnProperty(key)) {
+				// Intentar la conversión a número si el parámetro parece numérico
+				const parsedNumber = parseInt(req.query[key]);
+				if (!isNaN(parsedNumber)) {
+					req.query[key] = parsedNumber;
+				}
+			}
+		}
+	
+		// Pasar el usuario a options si está disponible
+		if (req.user) this.options.user = req.user.payload;
+	
 		try {
 			try {
 				const { count, data } = await this.service.all(req.query, this.options);
@@ -64,10 +68,9 @@ export default class PrimateController {
 					message: this.modelName + ' retrieved successfully',
 					props: { count },
 				});
-
-			} catch(e) {
+			} catch (e) {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
-
+	
 				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
 				return res.respond({
 					data,
@@ -75,8 +78,7 @@ export default class PrimateController {
 					props: { count },
 				});
 			}
-
-		} catch(e) {
+		} catch (e) {
 			next(createError(401, e.message));
 		}
 	}
