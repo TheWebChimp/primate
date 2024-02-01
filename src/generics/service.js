@@ -13,8 +13,11 @@ class PrimateService {
 	// Create ----------------------------------------------------------------------------------------------------------
 	static async create(data, model, options) {
 
+		if(!model) throw new Error('Model is required to create an item.');
+
 		try {
-			data = this.validate(data, 'create');
+
+			if(options.filterCreateData) data = await options.filterCreateData(data, model);
 
 			// Check relations to see if we need to connect
 			// first get the fields of the model
@@ -86,10 +89,16 @@ class PrimateService {
 	}
 
 	// Update ----------------------------------------------------------------------------------------------------------
-	static async update(id, data, model) {
+	static async update(id, data, model, options) {
+
+		if(!id) throw new Error('ID is required to update an item.');
+		if(!model) throw new Error('Model is required to update an item.');
 
 		try {
-			data = this.validate(data, 'update');
+
+			if(options.filterUpdateData) {
+				data = await options.filterUpdateData(data, model);
+			}
 
 			// Check relations to see if we need to connect
 			// first get the fields of the model
@@ -334,6 +343,8 @@ class PrimateService {
 
 		const args = {};
 
+		if(!model) throw new Error('Model is required to get an item.');
+
 		if(options.resolveWhere) args.where = options.resolveWhere(id, model);
 		else args.where = PrimateService.resolveWhere(id, model);
 
@@ -460,10 +471,6 @@ class PrimateService {
 		return prisma[model].findUnique({
 			where: { id },
 		});
-	}
-
-	static validate(data, method) {
-		return data;
 	}
 }
 

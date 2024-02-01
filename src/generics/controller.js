@@ -48,7 +48,7 @@ export default class PrimateController {
 
 		// hook all globally
 		if(primate.hooks?.all) {
-			primate.hooks.all(req, res, next);
+			primate.hooks.all(req, res, next, this.options);
 		}
 
 		// Convert query parameters that look like numbers to integers
@@ -61,10 +61,10 @@ export default class PrimateController {
 				}
 			}
 		}
-	
+
 		// Pasar el usuario a options si está disponible
 		if (req.user) this.options.user = req.user.payload;
-	
+
 		try {
 			try {
 				const { count, data } = await this.service.all(req.query, this.options);
@@ -75,7 +75,7 @@ export default class PrimateController {
 				});
 			} catch (e) {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
-	
+
 				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
 				return res.respond({
 					data,
@@ -168,9 +168,7 @@ export default class PrimateController {
 
 	// Update a record
 	async update(req, res) {
-
 		const options = {};
-		console.log('this.service', typeof this.service);
 
 		try {
 			// Remove id from body
@@ -180,30 +178,21 @@ export default class PrimateController {
 			let record;
 
 			try {
-
 				if(typeof this.service.get === 'function') {
-					oldRecord = await this.service.get(req.params.id);
+					oldRecord = await this.service.get(req.params.id, this.options);
 				} else {
-					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
+					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
 				}
-				record = await this.service.update(req.params.id, req.body);
-			} catch(e) {
-				console.log('ENTRANDO', e);
-				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
-				record = await PrimateService.update(req.params.id, req.body, this.entity, options);
-			}
 
-			// Register the event in the log
-			/*await LogService.registerEvent({
-				idUser: req.user.payload.id,
-				action: 'update',
-				description: this.modelName + ' updated',
-				metas: {
-					entity: this.entity,
-					record: record,
-					oldRecord: oldRecord,
-				},
-			});*/
+				if(typeof this.service.update === 'function') {
+					record = await this.service.update(req.params.id, req.body, this.options);
+				} else {
+					record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
+				}
+			} catch(e) {
+				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
+				record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
+			}
 
 			res.respond({
 				data: record,
@@ -277,17 +266,6 @@ export default class PrimateController {
 	async updateMetas(req, res) {
 		try {
 			const record = await PrimateService.updateMetas(req.params.id, req.body, this.entity);
-
-			// Register the event in the log
-			/*await LogService.registerEvent({
-				idUser: req.user.payload.id,
-				action: 'update',
-				description: this.modelName + ' updated',
-				metas: {
-					entity: this.entity,
-					record: record,
-				},
-			});*/
 
 			res.respond({
 				data: record,
