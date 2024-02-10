@@ -14,7 +14,12 @@ app.use(helmet({
 	crossOriginResourcePolicy: false,
 }));
 
-app.use(bodyParser.json());
+app.use((req, res, next) => {
+    if (req.url.startsWith('/raw/')) { 
+        return next(); 
+    }
+    bodyParser.json()(req, res, next);
+});
 
 // Enabling CORS for all requests
 app.use(cors());
@@ -51,5 +56,7 @@ app.response.respond = function({
 		.status(status)
 		.send(jsonResponse);
 };
+
+
 
 export default app;

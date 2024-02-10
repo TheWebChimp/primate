@@ -11,7 +11,6 @@ import { getRouter, auth, setupRoute } from './route.js';
 class Primate {
 	constructor(config = {}) {
 		this.app = app;
-		this.hooks = {};
 	}
 
 	use(...args) { this.app.use(...args); }

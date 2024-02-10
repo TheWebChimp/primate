@@ -2,7 +2,8 @@ import createError from 'http-errors';
 import PrimateService from '../generics/service.js';
 import fs from 'fs';
 import chalk from 'chalk';
-import primate from '../primate.js';
+
+//import LogService from '../generics/log.service.js';
 
 export default class PrimateController {
 
@@ -45,12 +46,6 @@ export default class PrimateController {
 
 	// Get all records
 	async all(req, res, next) {
-
-		// hook all globally
-		if(primate.hooks?.all) {
-			primate.hooks.all(req, res, next, this.options);
-		}
-
 		// Convert query parameters that look like numbers to integers
 		for (const key in req.query) {
 			if (req.query.hasOwnProperty(key)) {
@@ -61,10 +56,10 @@ export default class PrimateController {
 				}
 			}
 		}
-
+	
 		// Pasar el usuario a options si está disponible
 		if (req.user) this.options.user = req.user.payload;
-
+	
 		try {
 			try {
 				const { count, data } = await this.service.all(req.query, this.options);
@@ -75,7 +70,7 @@ export default class PrimateController {
 				});
 			} catch (e) {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
-
+	
 				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
 				return res.respond({
 					data,
@@ -168,7 +163,9 @@ export default class PrimateController {
 
 	// Update a record
 	async update(req, res) {
+
 		const options = {};
+		console.log('this.service', typeof this.service);
 
 		try {
 			// Remove id from body
@@ -178,21 +175,30 @@ export default class PrimateController {
 			let record;
 
 			try {
-				if(typeof this.service.get === 'function') {
-					oldRecord = await this.service.get(req.params.id, this.options);
-				} else {
-					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
-				}
 
-				if(typeof this.service.update === 'function') {
-					record = await this.service.update(req.params.id, req.body, this.options);
+				if(typeof this.service.get === 'function') {
+					oldRecord = await this.service.get(req.params.id);
 				} else {
-					record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
+					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
 				}
+				record = await this.service.update(req.params.id, req.body);
 			} catch(e) {
-				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
-				record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
+				console.log('ENTRANDO', e);
+				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query);
+				record = await PrimateService.update(req.params.id, req.body, this.entity, options);
 			}
+
+			// Register the event in the log
+			/*await LogService.registerEvent({
+				idUser: req.user.payload.id,
+				action: 'update',
+				description: this.modelName + ' updated',
+				metas: {
+					entity: this.entity,
+					record: record,
+					oldRecord: oldRecord,
+				},
+			});*/
 
 			res.respond({
 				data: record,
@@ -266,6 +272,17 @@ export default class PrimateController {
 	async updateMetas(req, res) {
 		try {
 			const record = await PrimateService.updateMetas(req.params.id, req.body, this.entity);
+
+			// Register the event in the log
+			/*await LogService.registerEvent({
+				idUser: req.user.payload.id,
+				action: 'update',
+				description: this.modelName + ' updated',
+				metas: {
+					entity: this.entity,
+					record: record,
+				},
+			});*/
 
 			res.respond({
 				data: record,
