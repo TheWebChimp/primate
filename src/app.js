@@ -20,7 +20,6 @@ app.use((req, res, next) => {
     }
     bodyParser.json()(req, res, next);
 });
-
 // Enabling CORS for all requests
 app.use(cors());
 
@@ -56,7 +55,5 @@ app.response.respond = function({
 		.status(status)
 		.send(jsonResponse);
 };
-
-
 
 export default app;
