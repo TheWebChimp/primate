@@ -12,8 +12,8 @@ export default class PrimateController {
 		//convert camel case to snake case
 		let serviceFileName = modelName.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-		//remove the _ at the beginning
-		serviceFileName = serviceFileName.substring(1);
+		//remove the _ at the beginning if it starts with one
+		if(serviceFileName.charAt(0) === '_') serviceFileName = serviceFileName.substring(1);
 
 		// Dynamically call the service for the model like this: `${modelName}Service` if we don't pass it
 		if(!options.service) {
