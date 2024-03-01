@@ -17,7 +17,7 @@ class PrimateService {
 
 		try {
 
-			if(options.filterCreateData) data = await options.filterCreateData(data, model);
+			if(options.filterCreateData) data = await options.filterCreateData(data, model, options);
 
 			// Check relations to see if we need to connect
 			// first get the fields of the model
