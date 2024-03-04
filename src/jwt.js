@@ -25,4 +25,26 @@ export default {
 			});
 		});
 	},
+	signRecoverToken(payload, seconds) {
+		return new Promise((resolve, reject) => {
+			jwt.sign({ payload }, accessTokenSecret, { expiresIn: seconds }, (err, token) => {
+				if(err) {
+					console.log(err);
+					reject(createError.InternalServerError());
+				}
+				resolve(token);
+			});
+		});
+	},
+	verifyRecoverToken(token) {
+		return new Promise((resolve, reject) => {
+			jwt.verify(token, accessTokenSecret, (err, payload) => {
+				if(err) {
+					const message = err.name === 'JsonWebTokenError' ? 'Unauthorized' : err.message;
+					return reject(createError.Unauthorized(message));
+				}
+				resolve(payload);
+			});
+		});
+	},
 };

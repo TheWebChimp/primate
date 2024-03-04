@@ -2,7 +2,7 @@ import app from './app.js';
 import chalk from 'chalk';
 import getPort from 'get-port';
 
-import { importRoutes, setupRoutes } from './utils.js';
+import { importRoutes, setupRoutes, importEntities } from './utils.js';
 import PrimateController from './generics/controller.js';
 import PrimateService from './generics/service.js';
 
@@ -32,6 +32,12 @@ class Primate {
 
 	async routes(routesDir = './routes') {
 		const routes = await importRoutes(routesDir);
+		setupRoutes(routes, primate.app);
+	}
+
+	async setup(entitiesDir = './entities') {
+
+		const routes = await importEntities(entitiesDir);
 		setupRoutes(routes, primate.app);
 	}
 }

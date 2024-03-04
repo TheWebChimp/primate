@@ -1,6 +1,7 @@
 import fs from 'fs';
 import express from 'express';
 import path from 'path';
+import pluralize from 'pluralize';
 
 async function importRoutes(directory) {
 	const modules = {};
@@ -14,8 +15,6 @@ async function importRoutes(directory) {
 		// Skip files that are not JavaScript files
 		if(path.extname(file) !== '.js') continue;
 
-		console.log(`Importing route: ${ file }`);
-
 		// Dynamically import the module
 		//const { router } = await import(`../../../../routes/${ file }`);
 
@@ -28,6 +27,39 @@ async function importRoutes(directory) {
 	}
 
 	return modules;
+}
+
+async function importEntities(directory) {
+
+	// read each filder in the directory and import the file with the same name as the folder
+	// return the imported files as an object
+
+	const entities = {};
+	const entitiesDir = directory;
+
+	// Read all file names in the directory
+	const files = fs.readdirSync(entitiesDir);
+
+	for(const file of files) {
+		// each file is a directory, read the file with the same name as the directory
+		const entityName = file;
+		const singular = pluralize.singular(entityName);
+
+		const entityFile = `${ entitiesDir }/${ file }/${ file }.js`;
+
+		// Skip files that are not JavaScript files
+		if(path.extname(entityFile) !== '.js') continue;
+
+		// Dynamically import the module
+		//const { router } = await import(`../../../../routes/${ file }`);
+		const { router } = await import(`file://${ process.cwd() }/${ entityFile }`);
+
+		// Add the router to the modules object
+		// The key can be the file name or some transformation of it
+		entities[entityName] = router;
+	}
+
+	return entities;
 }
 
 function setupRoutes(modules, app) {
@@ -79,4 +111,4 @@ function setupStatusRoute(app) {
 }
 
 // Export the functions
-export { importRoutes, setupRoutes };
+export { importRoutes, setupRoutes, importEntities };

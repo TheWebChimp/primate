@@ -11,17 +11,21 @@ class PrimateService {
 	// Create, Update, Delete, All, Get
 
 	// Create ----------------------------------------------------------------------------------------------------------
-	static async create(data, model, options) {
+	static async create(data, model, options = {}) {
 
 		if(!model) throw new Error('Model is required to create an item.');
+
+		// model to lowercase
+		model = model.toLowerCase();
 
 		try {
 
 			if(options.filterCreateData) data = await options.filterCreateData(data, model, options);
 
 			// Check relations to see if we need to connect
-			// first get the fields of the model
-			const modelFields = PrismaOrmObject[model];
+			// first get the fields of the model (getORMObject)
+			const modelFields = PrimateService.getORMObject(model);
+
 			const relations = modelFields['relations'] || null;
 
 			if(relations) {
@@ -89,7 +93,7 @@ class PrimateService {
 	}
 
 	// Update ----------------------------------------------------------------------------------------------------------
-	static async update(id, data, model, options) {
+	static async update(id, data, model, options = {}) {
 
 		if(!id) throw new Error('ID is required to update an item.');
 		if(!model) throw new Error('Model is required to update an item.');
@@ -178,10 +182,20 @@ class PrimateService {
 			// Sanitize data to avoid errors removing the fields that are not in the model
 			data = this.sanitizeData(data, model);
 
-			return await prisma[model].update({
-				where: { id: parseInt(id) },
-				data,
-			});
+			let where;
+			// if option.searchFields exists && id is not a number
+			if(options.searchField && isNaN(parseInt(id))) {
+				// check if the model has the field
+				if(modelFields.hasOwnProperty(options.searchField)) {
+					where = {
+						[options.searchField]: modelFields[options.searchField].type === 'Int' ? parseInt(id) : id,
+					};
+				}
+			} else {
+				where = { id: PrimateService.resolveId(id, model) };
+			}
+
+			return await prisma[model].update({ where, data });
 		} catch(e) {
 			throw e;
 		}
@@ -345,8 +359,25 @@ class PrimateService {
 
 		if(!model) throw new Error('Model is required to get an item.');
 
+		// model to lowercase
+		model = model.toLowerCase();
+
+		const modelFields = PrismaOrmObject[model];
+
 		if(options.resolveWhere) args.where = options.resolveWhere(id, model);
-		else args.where = PrimateService.resolveWhere(id, model);
+		else {
+			// if option.searchFields exists && id is not a number
+			if(options.searchField && isNaN(parseInt(id))) {
+				// check if the model has the field
+				if(modelFields.hasOwnProperty(options.searchField)) {
+					args.where = {
+						[options.searchField]: modelFields[options.searchField].type === 'Int' ? parseInt(id) : id,
+					};
+				}
+			} else {
+				args.where = { id: PrimateService.resolveId(id, model) };
+			}
+		}
 
 		// get the "include" parameter from the query
 		let include = query.include || null;
@@ -465,6 +496,20 @@ class PrimateService {
 		}
 
 		return where;
+	}
+
+	static getORMObject(model) {
+		return PrismaOrmObject[model];
+	}
+
+	static resolveId(id, model) {
+		const orm = PrimateService.getORMObject(model);
+		// check if id is String or Int
+		if(orm.id === 'Int') {
+			return parseInt(id);
+		} else {
+			return id;
+		}
 	}
 
 	static findById(id, model) {

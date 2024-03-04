@@ -3,6 +3,7 @@ import PrimateService from '../generics/service.js';
 import fs from 'fs';
 import chalk from 'chalk';
 import primate from '../primate.js';
+import pluralize from 'pluralize';
 
 export default class PrimateController {
 
@@ -11,6 +12,8 @@ export default class PrimateController {
 
 		//convert camel case to snake case
 		let serviceFileName = modelName.replace(/([A-Z])/g, '-$1').toLowerCase();
+		this.singular = serviceFileName;
+		this.plural = pluralize(this.singular);
 
 		//remove the _ at the beginning if it starts with one
 		if(serviceFileName.charAt(0) === '_') serviceFileName = serviceFileName.substring(1);
@@ -20,18 +23,17 @@ export default class PrimateController {
 			try {
 
 				// check that file exists
-				const file = fs.readFileSync(`./services/${ serviceFileName }.service.js`);
+				const file = fs.readFileSync(`./entities/${ this.plural }/${ this.singular }.service.js`);
 
 				// import the service dynamically
 				(async () => {
-					const { default: dynamicController } = await import(`file://${ process.cwd() }/services/${ serviceFileName }.service.js`);
+					const { default: dynamicController } = await import(`file://${ process.cwd() }/entities/${ this.plural }/${ this.singular }.service.js`);
 					this.service = dynamicController;
-					// ...
 				})();
 
 			} catch(e) {
 				// Chalk warning
-				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ serviceFileName }" was not found in the services directory.`);
+				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ this.singular }" was not found in the services directory: ${ e }`);
 			}
 		} else this.service = options.service;
 
@@ -52,18 +54,18 @@ export default class PrimateController {
 		}
 
 		// Convert query parameters that look like numbers to integers
-		for (const key in req.query) {
-			if (req.query.hasOwnProperty(key)) {
+		for(const key in req.query) {
+			if(req.query.hasOwnProperty(key)) {
 				// Intentar la conversión a número si el parámetro parece numérico
 				const parsedNumber = parseInt(req.query[key]);
-				if (!isNaN(parsedNumber)) {
+				if(!isNaN(parsedNumber)) {
 					req.query[key] = parsedNumber;
 				}
 			}
 		}
 
 		// Pasar el usuario a options si está disponible
-		if (req.user) this.options.user = req.user.payload;
+		if(req.user) this.options.user = req.user.payload;
 
 		try {
 			try {
@@ -73,7 +75,7 @@ export default class PrimateController {
 					message: this.modelName + ' retrieved successfully',
 					props: { count },
 				});
-			} catch (e) {
+			} catch(e) {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
 
 				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
@@ -83,7 +85,7 @@ export default class PrimateController {
 					props: { count },
 				});
 			}
-		} catch (e) {
+		} catch(e) {
 			next(createError(401, e.message));
 		}
 	}
@@ -168,7 +170,9 @@ export default class PrimateController {
 
 	// Update a record
 	async update(req, res) {
-		const options = {};
+
+		// add the current user id to the data
+		if(req.user) this.options.idUser = req.user.payload.id;
 
 		try {
 			// Remove id from body
@@ -183,6 +187,8 @@ export default class PrimateController {
 				} else {
 					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
 				}
+
+				console.log('oldRecord', oldRecord);
 
 				if(typeof this.service.update === 'function') {
 					record = await this.service.update(req.params.id, req.body, this.options);

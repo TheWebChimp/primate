@@ -3,9 +3,9 @@ import { Prisma } from '@prisma/client';
 const obj = {};
 
 if(Prisma.dmmf) {
-
 	const prismaModels = Prisma.dmmf.datamodel.models;
 	for(const model of prismaModels) {
+
 		const modelName = model.name;
 
 		if(modelName) {
@@ -14,7 +14,7 @@ if(Prisma.dmmf) {
 			obj[camelCaseModelName] = {};
 			for(const field of model.fields) {
 				const fieldName = field.name;
-				obj[camelCaseModelName][fieldName] = true;
+				obj[camelCaseModelName][fieldName] = field.type;
 			}
 		}
 	}
@@ -64,7 +64,6 @@ if(Prisma.dmmf) {
 					if(field !== 'relations') {
 						// check if field is something like "idModel"
 						if(field === `id${ otherModelCamelCase }`) {
-							console.log(model, otherModelCamelCase, field);
 							// iterate fields of otherModel
 							for(const otherField of Object.keys(obj[otherModel])) {
 								if(otherField !== 'relations') {
@@ -92,4 +91,5 @@ if(Prisma.dmmf) {
 		}
 	}
 }
+
 export const PrismaOrmObject = obj;
