@@ -368,12 +368,30 @@ class PrimateService {
 		else {
 			// if option.searchFields exists && id is not a number
 			if(options.searchField && isNaN(parseInt(id))) {
-				// check if the model has the field
-				if(modelFields.hasOwnProperty(options.searchField)) {
+				console.log('searchField', options.searchField);
+
+				const toSearch = [];
+
+				// foreach field in searchFields
+				for(const field of options.searchField) {
+					// check if the model has the field
+					if(modelFields.hasOwnProperty(field)) {
+						toSearch.push({
+							[field]: modelFields[field].type === 'Int' ? parseInt(id) : id,
+						});
+					}
+				}
+
+				// if the toSearch array has only one element, we use it
+				if(toSearch.length === 1) {
+					args.where = toSearch[0];
+				} else {
+					// if not, we use the OR operator
 					args.where = {
-						[options.searchField]: modelFields[options.searchField].type === 'Int' ? parseInt(id) : id,
+						OR: toSearch,
 					};
 				}
+
 			} else {
 				args.where = { id: PrimateService.resolveId(id, model) };
 			}
@@ -404,7 +422,9 @@ class PrimateService {
 		}
 
 		try {
-			let get = await prisma[model].findUnique(args);
+			console.log(args);
+
+			let get = await prisma[model].findFirst(args);
 			if(!!options.filterGetItem) get = await options.filterGetItem(get, query);
 			return get;
 
