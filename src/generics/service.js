@@ -15,8 +15,8 @@ class PrimateService {
 
 		if(!model) throw new Error('Model is required to create an item.');
 
-		// model to lowercase
-		model = model.toLowerCase();
+		// convert first letter of model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
 
@@ -97,6 +97,9 @@ class PrimateService {
 
 		if(!id) throw new Error('ID is required to update an item.');
 		if(!model) throw new Error('Model is required to update an item.');
+
+		// convert first letter of model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
 
@@ -203,6 +206,13 @@ class PrimateService {
 
 	// Delete ----------------------------------------------------------------------------------------------------------
 	static async delete(id, model) {
+
+		if(!id) throw new Error('ID is required to update an item.');
+		if(!model) throw new Error('Model is required to update an item.');
+
+		// convert first letter of model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
+
 		try {
 			return await prisma[model].delete({ where: { id: parseInt(id) } });
 		} catch(e) {
@@ -359,8 +369,8 @@ class PrimateService {
 
 		if(!model) throw new Error('Model is required to get an item.');
 
-		// model to lowercase
-		model = model.toLowerCase();
+		// convert first letter of model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
 
 		const modelFields = PrismaOrmObject[model];
 
@@ -422,7 +432,6 @@ class PrimateService {
 		}
 
 		try {
-			console.log(args);
 
 			let get = await prisma[model].findFirst(args);
 			if(!!options.filterGetItem) get = await options.filterGetItem(get, query);

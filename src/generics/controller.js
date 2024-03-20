@@ -159,6 +159,7 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
+			console.log('Error retrieving ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error retrieving ' + this.modelName + ': ' + e.message;
 
 			res.respond({
