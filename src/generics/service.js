@@ -249,6 +249,9 @@ class PrimateService {
 		if(q) {
 			// check there are queryable fields
 			if(options.queryableFields) {
+
+				console.log('queryableFields', options.queryableFields);
+
 				queryObject.where = {
 					OR: [],
 				};
@@ -260,12 +263,38 @@ class PrimateService {
 					});
 				}
 
+				const modelFields = PrimateService.getORMObject(model);
+
 				options.queryableFields.forEach(field => {
-					queryObject.where.OR.push({
-						[field]: {
-							contains: q,
-						},
-					});
+					if(modelFields.hasOwnProperty(field)) {
+						queryObject.where.OR.push({
+							[field]: {
+								contains: q,
+							},
+						});
+					} else {
+						console.log(field);
+
+						// check if the field has a dot, meaning it is a relation
+						if(field.includes('.')) {
+							// left part is the relation
+							const relation = field.split('.')[0];
+
+							// right part is the field
+							const subfield = field.split('.')[1];
+
+							// check if the relation exists
+							if(modelFields.hasOwnProperty(relation)) {
+								queryObject.where.OR.push({
+									[relation]: {
+										[subfield]: {
+											contains: q,
+										},
+									},
+								});
+							}
+						}
+					}
 				});
 			}
 		}
@@ -303,6 +332,8 @@ class PrimateService {
 			skip: (parseInt(page) - 1) * parseInt(limit),
 			take: parseInt(limit),
 		};
+
+		console.log(args);
 
 		if(options.include) args.include = options.include;
 
