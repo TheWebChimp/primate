@@ -2,6 +2,7 @@ import fs from 'fs';
 import express from 'express';
 import path from 'path';
 import pluralize from 'pluralize';
+import createError from 'http-errors';
 
 async function importRoutes(directory) {
 	const modules = {};
@@ -73,7 +74,11 @@ function setupRoutes(modules, app) {
 			continue;
 		}
 
-		app.use(`/${ moduleName }`, router);
+		try {
+			app.use(`/${ moduleName }`, router);
+		} catch(err) {
+			console.error(err);
+		}
 	}
 
 	setupStatusRoute(app);
@@ -110,5 +115,25 @@ function setupStatusRoute(app) {
 	});
 }
 
+function requiredFields(fields = {}) {
+
+	if(!Object.values(fields).length) return;
+	const missingFields = Object.keys(fields).filter((field) => !fields[field]);
+
+	if(missingFields.length) {
+
+		// string with missing fields
+		const missingFieldsStr = Object.keys(fields).join(', ');
+		return createError.BadRequest('Missing required fields: ' + missingFieldsStr);
+	}
+
+	return null;
+}
+
 // Export the functions
-export { importRoutes, setupRoutes, importEntities };
+export {
+	importRoutes,
+	setupRoutes,
+	importEntities,
+	requiredFields,
+};

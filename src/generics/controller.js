@@ -64,27 +64,45 @@ export default class PrimateController {
 			}
 		}
 
-		// Pasar el usuario a options si está disponible
+		// add the current user id to the data
 		if(req.user) this.options.user = req.user.payload;
 
 		try {
-			try {
+			if(typeof this.service?.all === 'function') {
+
 				const { count, data } = await this.service.all(req.query, this.options);
+
+				if(data.length === 0) {
+					return res.respond({
+						status: 404,
+						message: this.plural + ' not found',
+					});
+				}
+
 				res.respond({
 					data,
 					message: this.modelName + ' retrieved successfully',
 					props: { count },
 				});
-			} catch(e) {
+			} else {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
 
 				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
+
+				if(data.length === 0) {
+					return res.respond({
+						status: 404,
+						message: this.plural + ' not found',
+					});
+				}
+
 				return res.respond({
 					data,
 					message: this.modelName + ' retrieved successfully',
 					props: { count },
 				});
 			}
+
 		} catch(e) {
 			next(createError(401, e.message));
 		}
@@ -104,22 +122,12 @@ export default class PrimateController {
 			// remove id from body
 			delete req.body.id;
 
-			try {
+			if(typeof this.service?.create === 'function') {
 				record = await this.service.create(req.body, options);
-			} catch(e) {
+			} else {
+				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
 				record = await PrimateService.create(req.body, this.entity, options);
 			}
-
-			// Register the event in the log
-			/*await LogService.registerEvent({
-				idUser: req.user.payload.id,
-				action: 'create',
-				description: this.modelName + ' created',
-				metas: {
-					entity: this.entity,
-					record: record,
-				},
-			});*/
 
 			res.respond({
 				data: record,
@@ -127,11 +135,15 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
+			console.log('Error creating ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error creating ' + this.modelName + ': ' + e.message;
 
 			if(e.code === 'P2002') {
 				message = this.modelName + ' already exists';
 			}
+
+			// replace \n with spaces in the message
+			message = message.replace(/\n/g, ' ');
 
 			res.respond({
 				result: 'error',
@@ -148,9 +160,24 @@ export default class PrimateController {
 			let record;
 
 			try {
-				record = await this.service.get(req.params.id, req.query, this.options);
+				if(typeof this.service?.get === 'function') {
+					record = await this.service.get(req.params.id, req.query, this.options);
+				} else {
+					console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
+					record = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
+				}
 			} catch(e) {
-				record = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
+				res.respond({
+					status: 500,
+					message: 'Error retrieving ' + this.modelName + ': ' + e.message,
+				});
+			}
+
+			if(!record) {
+				return res.respond({
+					status: 404,
+					message: this.modelName + ' not found',
+				});
 			}
 
 			res.respond({
@@ -182,22 +209,15 @@ export default class PrimateController {
 			let oldRecord;
 			let record;
 
-			try {
-				if(typeof this.service.get === 'function') {
-					oldRecord = await this.service.get(req.params.id, this.options);
-				} else {
-					oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
-				}
-
-				console.log('oldRecord', oldRecord);
-
-				if(typeof this.service.update === 'function') {
-					record = await this.service.update(req.params.id, req.body, this.options);
-				} else {
-					record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
-				}
-			} catch(e) {
+			if(typeof this.service?.get === 'function') {
+				oldRecord = await this.service.get(req.params.id, this.options);
+			} else {
 				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
+			}
+
+			if(typeof this.service?.update === 'function') {
+				record = await this.service.update(req.params.id, req.body, this.options);
+			} else {
 				record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
 			}
 
@@ -207,6 +227,10 @@ export default class PrimateController {
 			});
 		} catch(e) {
 			let message = 'Error updating ' + this.modelName + ': ' + e.message;
+
+			if(e.code === 'P2025') {
+				message = 'Error updating ' + this.modelName + ': ' + e.meta.cause;
+			}
 
 			if(e.code === 'P2002') {
 				message = this.modelName + ' already exists';
@@ -223,18 +247,14 @@ export default class PrimateController {
 	// Delete a record
 	async delete(req, res) {
 		try {
-			const record = await PrimateService.delete(req.params.id, this.entity);
 
-			// Register the event in the log
-			/*await LogService.registerEvent({
-				idUser: req.user.payload.id,
-				action: 'delete',
-				description: this.modelName + ' deleted',
-				metas: {
-					entity: this.entity,
-					record: record,
-				},
-			});*/
+			if(typeof this.service?.delete === 'function') {
+
+				const record = await this.service.delete(req.params.id, this.options);
+			} else {
+
+				const record = await PrimateService.delete(req.params.id, this.entity);
+			}
 
 			res.respond({
 				data: record,
