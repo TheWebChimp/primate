@@ -30,6 +30,7 @@ class Primate {
 		});
 
 		if (config && typeof config.timeout === 'number') {
+			// set the server timeout if it is provided in the config
 			server.setTimeout(config.timeout);
 		}
 	}
