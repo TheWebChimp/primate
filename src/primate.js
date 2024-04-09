@@ -16,7 +16,7 @@ class Primate {
 
 	use(...args) { this.app.use(...args); }
 
-	async start(port = process.env.PORT) {
+	async start({ port = process.env.PORT, config = {} } = {}) {
 
 		// fallback to 1337 if env.PORT is not set
 		if(!port) port = await getPort({ port: [ 1337, 8008, 10101 ] });
@@ -24,10 +24,14 @@ class Primate {
 
 		// search for a random port if port 1337 is already in use
 
-		this.app.listen(port, () => {
+		const server = this.app.listen(port, () => {
 			console.log(chalk.white.bgRgb(204, 0, 0).bold(` 🐵 🙈 🙉 🙊 PRIMATE STARTED 🙊 🙉 🙈 🐵 `));
 			console.log(chalk.yellowBright.bgBlack.bold(`Listening on port ${ port }! `));
 		});
+
+		if (config && typeof config.timeout === 'number') {
+			server.setTimeout(config.timeout);
+		}
 	}
 
 	async routes(routesDir = './routes') {
