@@ -1,6 +1,7 @@
 import app from './app.js';
 import chalk from 'chalk';
 import getPort from 'get-port';
+import fs from 'fs';
 
 import { importRoutes, setupRoutes, importEntities } from './utils.js';
 import PrimateController from './generics/controller.js';
@@ -36,6 +37,13 @@ class Primate {
 	}
 
 	async setup(entitiesDir = './entities') {
+
+		// check that the entities directory exists
+		// if not, throw an error
+		if(!fs.existsSync(entitiesDir)) {
+			console.log(chalk.red('Entities directory not found:'), entitiesDir);
+			return false;
+		}
 
 		const routes = await importEntities(entitiesDir);
 		setupRoutes(routes, primate.app);
