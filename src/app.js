@@ -14,8 +14,18 @@ app.use(helmet({
 	crossOriginResourcePolicy: false,
 }));
 
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use((req, res, next) => {
+	if(req.originalUrl.startsWith('/raw')) {
+		next();
+	} else {
+		express.json({
+			limit: '10mb',
+		})(req, res, next);
+	}
+});
+
+//app.use(bodyParser.json({ limit: '10mb' }));
+//app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 //app.use(express.json());
 
 // Enabling CORS for all requests
