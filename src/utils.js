@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import pluralize from 'pluralize';
 import createError from 'http-errors';
+import chalk from 'chalk';
 
 async function importRoutes(directory) {
 	const modules = {};
@@ -42,22 +43,33 @@ async function importEntities(directory) {
 	const files = fs.readdirSync(entitiesDir);
 
 	for(const file of files) {
-		// each file is a directory, read the file with the same name as the directory
-		const entityName = file;
-		const singular = pluralize.singular(entityName);
 
-		const entityFile = `${ entitiesDir }/${ file }/${ file }.js`;
+		try {
+			// each file is a directory, read the file with the same name as the directory
+			const entityName = file;
+			const singular = pluralize.singular(entityName);
 
-		// Skip files that are not JavaScript files
-		if(path.extname(entityFile) !== '.js') continue;
+			const entityFile = `${ entitiesDir }/${ file }/${ file }.js`;
 
-		// Dynamically import the module
-		//const { router } = await import(`../../../../routes/${ file }`);
-		const { router } = await import(`file://${ process.cwd() }/${ entityFile }`);
+			// Skip files that are not JavaScript files
+			if(path.extname(entityFile) !== '.js') continue;
 
-		// Add the router to the modules object
-		// The key can be the file name or some transformation of it
-		entities[entityName] = router;
+			// Check if the file exists
+			if(!fs.existsSync(entityFile)) {
+				throw new Error(`File not found: ${ entityFile }`);
+			}
+
+			// Dynamically import the module
+			//const { router } = await import(`../../../../routes/${ file }`);
+			const { router } = await import(`file://${ process.cwd() }/${ entityFile }`);
+
+			// Add the router to the modules object
+			// The key can be the file name or some transformation of it
+			entities[entityName] = router;
+		} catch(err) {
+
+			console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `There's no route file found for entity "${ file }":`, err.message);
+		}
 	}
 
 	return entities;
