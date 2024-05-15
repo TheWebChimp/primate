@@ -214,7 +214,7 @@ class PrimateService {
 		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
-			return await prisma[model].delete({ where: { id: parseInt(id) } });
+			return await prisma[model].delete({ where: { id: PrimateService.resolveId(id, model) } });
 		} catch(e) {
 			throw e;
 		}

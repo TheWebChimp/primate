@@ -248,12 +248,14 @@ export default class PrimateController {
 	async delete(req, res) {
 		try {
 
+			let record;
+
 			if(typeof this.service?.delete === 'function') {
 
-				const record = await this.service.delete(req.params.id, this.options);
+				record = await this.service.delete(req.params.id, this.options);
 			} else {
 
-				const record = await PrimateService.delete(req.params.id, this.entity);
+				record = await PrimateService.delete(req.params.id, this.entity);
 			}
 
 			res.respond({
