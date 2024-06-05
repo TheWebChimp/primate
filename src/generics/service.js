@@ -11,6 +11,18 @@ class PrimateService {
 	// Create, Update, Delete, All, Get
 
 	// Create ----------------------------------------------------------------------------------------------------------
+
+	/**
+	 * Creates a new record in the database.
+	 *
+	 * @param {Object} data - The data to be created.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Function} [options.filterCreateData] - Function to filter create data.
+	 * @param {Object} [options.upsertRules] - Rules for upsert operations.
+	 * @returns {Promise<Object>} The created record.
+	 * @throws {Error} If any error occurs during creation.
+	 */
 	static async create(data, model, options = {}) {
 
 		if(!model) throw new Error('Model is required to create an item.');
@@ -22,14 +34,12 @@ class PrimateService {
 
 			if(options.filterCreateData) data = await options.filterCreateData(data, model, options);
 
-			// Check relations to see if we need to connect
-			// first get the fields of the model (getORMObject)
+			// Get the fields of the model
 			const modelFields = PrimateService.getORMObject(model);
-
-			const relations = modelFields['relations'] || null;
+			const relations = modelFields.relations || null;
 
 			if(relations) {
-				// iterate over relations
+				// Handle one-to-many and many-to-many relations
 				for(const [ relation, relationData ] of Object.entries(relations)) {
 					if(relationData.type === 'one-to-many' && !!data[relationData.field]) {
 						data[relationData.model] = {
@@ -42,57 +52,54 @@ class PrimateService {
 					}
 
 					if(relationData.type === 'many-to-many' && !!data[relationData.plural]) {
-						// check if the relation is an object
 						if(Array.isArray(data[relationData.plural])) {
-
-							// check if the relation is an array of objects with id
-							if(typeof data[relationData.plural][0] === 'object' && data[relationData.plural][0].hasOwnProperty('id')) {
-
-								data[relationData.plural] = {
-									connect: data[relationData.plural].map((item) => ({ id: parseInt(item.id) })),
-								};
-
-							} else {
-								// check if the relation is an array with plain ids
-								data[relationData.plural] = {
-									connect: data[relationData.plural].map((item) => ({ id: parseInt(item) })),
-								};
-							}
+							data[relationData.plural] = {
+								connect: data[relationData.plural].map(item =>
+									typeof item === 'object' && item.hasOwnProperty('id')
+										? { id: parseInt(item.id, 10) }
+										: { id: parseInt(item, 10) },
+								),
+							};
 						}
 					}
 				}
 			}
 
-			// Sanitize data to avoid errors removing the fields that are not in the model
+			// Sanitize data to avoid errors
 			data = this.sanitizeData(data, model);
 
-			// Check if options.upsertRules is set
-			if(options && options.upsertRules) {
-				// iterate over the rules
+			// Handle upsert rules if set
+			if(options.upsertRules) {
 				for(const [ field, rule ] of Object.entries(options.upsertRules)) {
-					// slugify
-					if(rule.slugify) {
-						// check if the field exists
-						if(data[rule.slugify]) {
-							// slugify the field
-							data[field] = slugify(data[rule.slugify], {
-								lower: true,
-							});
-						}
+					if(rule.slugify && data[rule.slugify]) {
+						data[field] = slugify(data[rule.slugify], {
+							lower: true,
+						});
 					}
 				}
 			}
 
-			return await prisma[model].create({
-				data,
-			});
+			return await prisma[model].create({ data });
 
 		} catch(e) {
-			throw e;
+			console.error('Error creating record:', e);
+			throw new Error(`Error creating ${ model }: ${ e.message }`);
 		}
 	}
 
 	// Update ----------------------------------------------------------------------------------------------------------
+	/**
+	 * Updates a record in the database.
+	 *
+	 * @param {number|string} id - The ID of the record to update.
+	 * @param {Object} data - The data to update.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Function} [options.filterUpdateData] - Function to filter update data.
+	 * @param {string} [options.searchField] - Field to search for the record if ID is not a number.
+	 * @returns {Promise<Object>} The updated record.
+	 * @throws {Error} If any error occurs during the update.
+	 */
 	static async update(id, data, model, options = {}) {
 
 		if(!id) throw new Error('ID is required to update an item.');
@@ -214,7 +221,7 @@ class PrimateService {
 		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
-			return await prisma[model].delete({ where: { id: PrimateService.resolveId(id, model) } });
+			return await prisma[model].delete({ where: { id: parseInt(id) } });
 		} catch(e) {
 			throw e;
 		}
@@ -273,6 +280,7 @@ class PrimateService {
 							},
 						});
 					} else {
+						console.log(field);
 
 						// check if the field has a dot, meaning it is a relation
 						if(field.includes('.')) {
@@ -360,20 +368,18 @@ class PrimateService {
 
 		// check if we are fetching a relation via query, it would be of type "fetch_[entity]"
 		// check if the query has a key that starts with "fetch_"
-		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch'));
+		const fetch = Object.keys(query).filter(key => key.startsWith('fetch-'))[0];
 
-		if(fetchs) {
-			for(const fetch of fetchs) {
-				// remove the "fetch_" part
-				const entity = fetch.replace('fetch-', '');
-				// check if the entity exists
-				if(PrismaOrmObject[model].hasOwnProperty(entity)) {
-					// add the entity to the include
-					args.include = {
-						...args.include,
-						[entity]: true,
-					};
-				}
+		if(fetch) {
+			// remove the "fetch_" part
+			const entity = fetch.replace('fetch-', '');
+			// check if the entity exists
+			if(PrismaOrmObject[model].hasOwnProperty(entity)) {
+				// add the entity to the "include"
+				args.include = {
+					...args.include,
+					[entity]: true,
+				};
 			}
 		}
 
@@ -573,10 +579,39 @@ class PrimateService {
 		}
 	}
 
+	/**
+	 * Finds a unique record in the database based on the provided criteria.
+	 *
+	 * @param {Object} where - The criteria to find the record.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [params={}] - Optional parameters.
+	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
+	 * @throws {Error} If any error occurs during the query.
+	 */
+	static async findBy(where, model, params = {}) {
+		if(!where || typeof where !== 'object') throw new Error('The "where" parameter must be a non-empty object.');
+		if(!model || typeof model !== 'string') throw new Error('The "model" parameter must be a non-empty string.');
+
+		try {
+			return await prisma[model].findFirst({
+				where,
+				...params,
+			});
+		} catch(e) {
+			console.error(`Error finding ${ model } with criteria ${ JSON.stringify(where) }:`, e);
+			throw new Error(`Error finding ${ model }: ${ e.message }`);
+		}
+	}
+
 	static findById(id, model) {
-		return prisma[model].findUnique({
-			where: { id },
-		});
+		try {
+
+			return prisma[model].findUnique({
+				where: { id },
+			});
+		} catch(e) {
+			throw e;
+		}
 	}
 }
 

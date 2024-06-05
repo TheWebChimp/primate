@@ -5,9 +5,18 @@ import chalk from 'chalk';
 import primate from '../primate.js';
 import pluralize from 'pluralize';
 
+/**
+ * Generic controller for handling CRUD operations.
+ */
 export default class PrimateController {
 
-	// Pass the plural and singular name of the model
+	/**
+	 * Creates an instance of PrimateController.
+	 *
+	 * @param {string} modelName - The name of the model.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Object} [options.service] - The service to be used, if not provided, it will be dynamically imported.
+	 */
 	constructor(modelName, options = {}) {
 
 		//convert camel case to snake case
@@ -23,7 +32,7 @@ export default class PrimateController {
 			try {
 
 				// check that file exists
-				const file = fs.readFileSync(`./entities/${ this.plural }/${ this.singular }.service.js`);
+				fs.readFileSync(`./entities/${ this.plural }/${ this.singular }.service.js`);
 
 				// import the service dynamically
 				(async () => {
@@ -35,7 +44,10 @@ export default class PrimateController {
 				// Chalk warning
 				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ this.singular }" was not found in the services directory: ${ e }`);
 			}
-		} else this.service = options.service;
+		} else {
+
+			this.service = options.service;
+		}
 
 		this.modelName = modelName;
 
@@ -45,10 +57,16 @@ export default class PrimateController {
 		this.options = options;
 	}
 
-	// Get all records
+	/**
+	 * Get all records.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} res - Express response object.
+	 * @param {Function} next - Express next middleware function.
+	 */
 	async all(req, res, next) {
 
-		// hook all globally
+		// Hook all globally
 		if(primate.hooks?.all) {
 			primate.hooks.all(req, res, next, this.options);
 		}
@@ -108,10 +126,14 @@ export default class PrimateController {
 		}
 	}
 
-	// Create a new record
+	/**
+	 * Create a new record.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} res - Express response object.
+	 */
 	async create(req, res) {
 
-		let record;
 		const options = { ...this.options };
 
 		// add the current user id to the data
@@ -122,11 +144,11 @@ export default class PrimateController {
 			// remove id from body
 			delete req.body.id;
 
-			if(typeof this.service?.create === 'function') {
-				record = await this.service.create(req.body, options);
-			} else {
+			const service = this.service?.create && typeof this.service?.create === 'function' ? this.service : PrimateService;
+			const record = await service.create(req.body, this.entity, options);
+
+			if(typeof this.service?.create !== 'function') {
 				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
-				record = await PrimateService.create(req.body, this.entity, options);
 			}
 
 			res.respond({
@@ -153,24 +175,19 @@ export default class PrimateController {
 		}
 	}
 
-	// Get a single record
+	/**
+	 * Get a single record.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} res - Express response object.
+	 */
 	async get(req, res) {
 		try {
+			const service = this.service?.get && this.service?.get === 'function' ? this.service : PrimateService;
+			const record = await service.get(req.params.id, this.entity, req.query, this.options);
 
-			let record;
-
-			try {
-				if(typeof this.service?.get === 'function') {
-					record = await this.service.get(req.params.id, req.query, this.options);
-				} else {
-					console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
-					record = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
-				}
-			} catch(e) {
-				res.respond({
-					status: 500,
-					message: 'Error retrieving ' + this.modelName + ': ' + e.message,
-				});
+			if(typeof this.service?.get !== 'function') {
+				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
 			}
 
 			if(!record) {
@@ -184,7 +201,6 @@ export default class PrimateController {
 				data: record,
 				message: this.modelName + ' retrieved successfully',
 			});
-
 		} catch(e) {
 			console.log('Error retrieving ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error retrieving ' + this.modelName + ': ' + e.message;
@@ -194,7 +210,7 @@ export default class PrimateController {
 				message,
 			});
 		}
-	};
+	}
 
 	// Update a record
 	async update(req, res) {
