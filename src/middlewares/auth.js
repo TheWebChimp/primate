@@ -49,8 +49,8 @@ const auth = async (req, res, next) => {
 			});
 		} else {
 			res.respond({
-				status: 500,
-				message: 'Internal Server Error: ' + e.message,
+				status: 401,
+				message: 'Unathorized: ' + e.message,
 			});
 		}
 	}
