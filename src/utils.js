@@ -105,7 +105,7 @@ function setupRoutes(modules, app) {
 		throw new Error('Modules must be a non-null object');
 	}
 
-	if(typeof app !== 'object' || app === null || typeof app.use !== 'function') {
+	if(typeof app !== 'function' || typeof app.use !== 'function') {
 		throw new Error('App must be a valid Express application instance');
 	}
 
@@ -142,7 +142,7 @@ function setupRoutes(modules, app) {
  */
 function setupStatusRoute(app) {
 	// Validate the app parameter
-	if(typeof app !== 'object' || app === null || typeof app.get !== 'function') {
+	if(typeof app !== 'function' || typeof app.get !== 'function') {
 		throw new Error('App must be a valid Express application instance');
 	}
 
@@ -184,7 +184,7 @@ function setupStatusRoute(app) {
  * @throws {Error} - Throws an error if the fields parameter is invalid.
  */
 function requiredFields(fields = {}) {
-	// Validate the fields parameter
+	// Validate the field parameter
 	if(typeof fields !== 'object' || fields === null) {
 		throw new Error('Fields must be a non-null object');
 	}

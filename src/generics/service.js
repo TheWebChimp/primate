@@ -483,11 +483,11 @@ class PrimateService {
 	/**
 	 * Prepares CRUD and additional routes for a given model.
 	 *
-	 * @param {express.Router} router - The Express router.
+	 * @param {Express.Router} router - The Express router.
 	 * @param {string|Object} model - The model name or an instance of a model controller.
 	 */
 	static prepareCrUDAGRoutes(router, model) {
-		if(!router || typeof router !== 'object' || typeof router.get !== 'function') {
+		if(!router || typeof router !== 'function' || typeof router.get !== 'function') {
 			throw new Error('A valid Express router is required.');
 		}
 		if(!model) {
