@@ -1,8 +1,8 @@
-import bodyParser from 'body-parser';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
+import bodyParser from 'body-parser'; // Import body-parser for parsing request bodies
+import express from 'express'; // Import express for creating the server
+import cors from 'cors'; // Import cors for enabling Cross-Origin Resource Sharing
+import helmet from 'helmet'; // Import helmet for securing the app by setting various HTTP headers
+import morgan from 'morgan'; // Import morgan for logging HTTP requests
 
 // Defining the Express app
 const app = express();
@@ -14,6 +14,7 @@ app.use(helmet({
 	crossOriginResourcePolicy: false,
 }));
 
+// Middleware to handle JSON parsing with a limit of 10mb
 app.use((req, res, next) => {
 	if(req.originalUrl.startsWith('/raw')) {
 		next();
@@ -31,9 +32,10 @@ app.use((req, res, next) => {
 // Enabling CORS for all requests
 app.use(cors());
 
-// Adding morgan to log HTTP requests
+// Adding morgan to log HTTP requests in the 'combined' format
 app.use(morgan('combined'));
 
+// Custom respond method to standardize API responses
 app.response.respond = function({
 	data = {},
 	result = 'success',
@@ -54,7 +56,7 @@ app.response.respond = function({
 		Object.assign(jsonResponse, props);
 	}
 
-	// if the status is not 2xx, set result to error
+	// If the status is not 2xx, set result to error
 	if(status < 200 || status > 299) {
 		jsonResponse.result = 'error';
 	}

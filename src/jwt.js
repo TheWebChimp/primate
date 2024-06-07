@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import createError from 'http-errors';
-import 'dotenv/config';
 
 const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
 

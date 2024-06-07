@@ -2,7 +2,7 @@ import pluralize from 'pluralize';
 import { Prisma } from '@prisma/client';
 
 /**
- * Generates an ORM object from Prisma datamodel.
+ * Generates an ORM object from the Prisma data model.
  *
  * @returns {Object} ORM object with models and relations.
  */

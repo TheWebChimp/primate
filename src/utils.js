@@ -1,84 +1,121 @@
 import fs from 'fs';
 import express from 'express';
 import path from 'path';
-import pluralize from 'pluralize';
 import createError from 'http-errors';
 import chalk from 'chalk';
 
+/**
+ * Asynchronously imports route modules from a specified directory.
+ *
+ * @param {string} directory - The directory containing route modules.
+ * @returns {Promise<Object>} - A promise that resolves to an object containing the imported route modules.
+ * @throws {Error} - Throws an error if the directory parameter is missing or invalid, or if any other error occurs during the import process.
+ */
 async function importRoutes(directory) {
+	// Validate directory
+	if(typeof directory !== 'string' || directory.trim() === '') {
+		throw new Error('Directory must be a non-empty string');
+	}
+
 	const modules = {};
 
-	const routersDir = directory;
+	try {
+		// Read all file names in the directory
+		const files = fs.readdirSync(directory);
 
-	// Read all file names in the directory
-	const files = fs.readdirSync(routersDir);
+		for(const file of files) {
+			// Skip files that are not JavaScript files
+			if(path.extname(file) !== '.js') continue;
 
-	for(const file of files) {
-		// Skip files that are not JavaScript files
-		if(path.extname(file) !== '.js') continue;
+			// Dynamically import the module
+			const { router } = await import(`file://${ process.cwd() }/${ directory }/${ file }`);
 
-		// Dynamically import the module
-		//const { router } = await import(`../../../../routes/${ file }`);
-
-		const { router } = await import(`file://${ process.cwd() }/${ routersDir }/${ file }`);
-
-		// Add the router to the modules object
-		// The key can be the file name or some transformation of it
-		const moduleName = path.basename(file, '.js');
-		modules[moduleName] = router;
+			// Add the router to the modules object
+			const moduleName = path.basename(file, '.js');
+			modules[moduleName] = router;
+		}
+	} catch(error) {
+		// Handle and rethrow any errors that occur during the import process
+		throw new Error(`Failed to import routes: ${ error.message }`);
 	}
 
 	return modules;
 }
 
+/**
+ * Asynchronously imports entity modules from a specified directory.
+ *
+ * @param {string} directory - The directory containing entity folders.
+ * @returns {Promise<Object>} - A promise that resolves to an object containing the imported entity modules.
+ * @throws {Error} - Throws an error if the directory parameter is missing or invalid.
+ */
 async function importEntities(directory) {
-
-	// read each filder in the directory and import the file with the same name as the folder
-	// return the imported files as an object
+	// Validate directory
+	if(typeof directory !== 'string' || directory.trim() === '') {
+		throw new Error('Directory must be a non-empty string');
+	}
 
 	const entities = {};
 	const entitiesDir = directory;
 
-	// Read all file names in the directory
-	const files = fs.readdirSync(entitiesDir);
+	try {
+		// Read all file names in the directory
+		const files = fs.readdirSync(entitiesDir);
 
-	for(const file of files) {
+		for(const file of files) {
+			try {
+				// Each file is a directory, read the file with the same name as the directory
+				const entityName = file;
+				const entityFile = `${ entitiesDir }/${ file }/${ file }.js`;
 
-		try {
-			// each file is a directory, read the file with the same name as the directory
-			const entityName = file;
-			const singular = pluralize.singular(entityName);
+				// Skip if the file is not a JavaScript file
+				if(path.extname(entityFile) !== '.js') continue;
 
-			const entityFile = `${ entitiesDir }/${ file }/${ file }.js`;
+				// Check if the file exists
+				if(!fs.existsSync(entityFile)) {
+					throw new Error(`File not found: ${ entityFile }`);
+				}
 
-			// Skip files that are not JavaScript files
-			if(path.extname(entityFile) !== '.js') continue;
+				// Dynamically import the module
+				const { router } = await import(`file://${ process.cwd() }/${ entityFile }`);
 
-			// Check if the file exists
-			if(!fs.existsSync(entityFile)) {
-				throw new Error(`File not found: ${ entityFile }`);
+				// Add the router to the entities object
+				entities[entityName] = router;
+			} catch(err) {
+				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `There's no route file found for entity "${ file }":`, err.message);
 			}
-
-			// Dynamically import the module
-			//const { router } = await import(`../../../../routes/${ file }`);
-			const { router } = await import(`file://${ process.cwd() }/${ entityFile }`);
-
-			// Add the router to the modules object
-			// The key can be the file name or some transformation of it
-			entities[entityName] = router;
-		} catch(err) {
-
-			console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `There's no route file found for entity "${ file }":`, err.message);
 		}
+	} catch(error) {
+		throw new Error(`Failed to import entities: ${ error.message }`);
 	}
 
 	return entities;
 }
 
+/**
+ * Sets up routes for the given modules on the provided Express app.
+ *
+ * @param {Object} modules - An object where keys are module names and values are routers.
+ * @param {Object} app - An instance of an Express application.
+ * @throws {Error} - Throws an error if the parameters are invalid.
+ */
 function setupRoutes(modules, app) {
+	// Validate parameters
+	if(typeof modules !== 'object' || modules === null) {
+		throw new Error('Modules must be a non-null object');
+	}
 
-	// iterate modules and add it to app
+	if(typeof app !== 'object' || app === null || typeof app.use !== 'function') {
+		throw new Error('App must be a valid Express application instance');
+	}
+
+	// Iterate modules and add them to the app
 	for(const [ moduleName, router ] of Object.entries(modules)) {
+		// Validate router
+		if(typeof router !== 'function') {
+			console.error(`Router for module "${ moduleName }" is not a valid function`);
+			continue;
+		}
 
 		// If the module name is 'index', 'default' or 'base', add the router to the root of the app
 		if([ 'index', 'default', 'base' ].includes(moduleName)) {
@@ -89,18 +126,29 @@ function setupRoutes(modules, app) {
 		try {
 			app.use(`/${ moduleName }`, router);
 		} catch(err) {
-			console.error(err);
+			console.error(`Failed to setup route for module "${ moduleName }":`, err);
 		}
 	}
 
+	// Set up a status route
 	setupStatusRoute(app);
 }
 
+/**
+ * Sets up a status route on the provided Express app with a random funny phrase.
+ *
+ * @param {Object} app - An instance of an Express application.
+ * @throws {Error} - Throws an error if the app parameter is invalid.
+ */
 function setupStatusRoute(app) {
+	// Validate the app parameter
+	if(typeof app !== 'object' || app === null || typeof app.get !== 'function') {
+		throw new Error('App must be a valid Express application instance');
+	}
+
 	const router = express.Router();
 
 	app.get('/', (req, res) => {
-
 		// Array of funny phrases
 		const phrases = [
 			'Primate is running smoother than a dolphin gliding through the ocean.',
@@ -118,7 +166,8 @@ function setupStatusRoute(app) {
 			'Primate is running more harmoniously than a choir singing a festive carol.',
 		];
 
-		return res.respond({
+		// Send a response with the current time and a random phrase
+		res.respond({
 			data: {
 				time: new Date(),
 			},
@@ -127,16 +176,29 @@ function setupStatusRoute(app) {
 	});
 }
 
+/**
+ * Checks for missing required fields and returns an error if any are missing.
+ *
+ * @param {Object} fields - An object representing the required fields and their values.
+ * @returns {Error|null} - Returns a BadRequest error if any required fields are missing, otherwise returns null.
+ * @throws {Error} - Throws an error if the fields parameter is invalid.
+ */
 function requiredFields(fields = {}) {
+	// Validate the fields parameter
+	if(typeof fields !== 'object' || fields === null) {
+		throw new Error('Fields must be a non-null object');
+	}
 
-	if(!Object.values(fields).length) return;
-	const missingFields = Object.keys(fields).filter((field) => !fields[field]);
+	// If there are no fields, return immediately
+	if(!Object.values(fields).length) return null;
 
+	// Filter out missing fields
+	const missingFields = Object.keys(fields).filter(field => !fields[field]);
+
+	// If there are missing fields, create and return an error
 	if(missingFields.length) {
-
-		// string with missing fields
-		const missingFieldsStr = Object.keys(fields).join(', ');
-		return createError.BadRequest('Missing required fields: ' + missingFieldsStr);
+		const missingFieldsStr = missingFields.join(', ');
+		return createError.BadRequest(`Missing required fields: ${ missingFieldsStr }`);
 	}
 
 	return null;

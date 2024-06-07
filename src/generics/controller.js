@@ -180,6 +180,7 @@ export default class PrimateController {
 	 *
 	 * @param {Object} req - Express request object.
 	 * @param {Object} res - Express response object.
+	 * @returns {Object} - The response object.
 	 */
 	async get(req, res) {
 		try {
@@ -197,7 +198,7 @@ export default class PrimateController {
 				});
 			}
 
-			res.respond({
+			return res.respond({
 				data: record,
 				message: this.modelName + ' retrieved successfully',
 			});
@@ -205,7 +206,7 @@ export default class PrimateController {
 			console.log('Error retrieving ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error retrieving ' + this.modelName + ': ' + e.message;
 
-			res.respond({
+			return res.respond({
 				status: 400,
 				message,
 			});
@@ -213,43 +214,70 @@ export default class PrimateController {
 	}
 
 	// Update a record
+	/**
+	 * Updates a record in the database.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} req.params - Request parameters.
+	 * @param {string} req.params.id - The ID of the record to update.
+	 * @param {Object} req.body - The data to update.
+	 * @param {Object} req.user - The authenticated user object.
+	 * @param {Object} res - Express response object.
+	 */
 	async update(req, res) {
-
-		// add the current user id to the data
-		if(req.user) this.options.idUser = req.user.payload.id;
-
 		try {
-			// Remove id from body
-			delete req.body.id;
+			const { id } = req.params;
+			const data = { ...req.body };
+			const { user } = req;
+			const { options, entity, service, modelName } = this;
 
-			let oldRecord;
-			let record;
-
-			if(typeof this.service?.get === 'function') {
-				oldRecord = await this.service.get(req.params.id, this.options);
-			} else {
-				oldRecord = await PrimateService.get(req.params.id, this.entity, req.query, this.options);
+			if(!id) {
+				throw new Error('ID is required to update an item.');
 			}
 
-			if(typeof this.service?.update === 'function') {
-				record = await this.service.update(req.params.id, req.body, this.options);
+			// Add the current user id to the data if available
+			if(user) {
+				options.idUser = user.payload.id;
+			}
+
+			// Remove id from the body to prevent updating the ID
+			delete data.id;
+
+			// Fetch the existing record
+			let oldRecord;
+			if(typeof service?.get === 'function') {
+				oldRecord = await service.get(id, options);
 			} else {
-				record = await PrimateService.update(req.params.id, req.body, this.entity, this.options);
+				oldRecord = await PrimateService.get(id, entity, req.query, options);
+			}
+
+			if(!oldRecord) {
+				return res.respond({
+					status: 404,
+					message: `${ modelName } not found`,
+				});
+			}
+
+			// Update the record
+			let updatedRecord;
+			if(typeof service?.update === 'function') {
+				updatedRecord = await service.update(id, data, options);
+			} else {
+				updatedRecord = await PrimateService.update(id, data, entity, options);
 			}
 
 			res.respond({
-				data: record,
-				message: this.modelName + ' updated successfully',
+				data: updatedRecord,
+				message: `${ modelName } updated successfully`,
 			});
 		} catch(e) {
-			let message = 'Error updating ' + this.modelName + ': ' + e.message;
+			console.error(`Error updating ${ this.modelName }:`, e);
 
+			let message = `Error updating ${ this.modelName }: ${ e.message }`;
 			if(e.code === 'P2025') {
-				message = 'Error updating ' + this.modelName + ': ' + e.meta.cause;
-			}
-
-			if(e.code === 'P2002') {
-				message = this.modelName + ' already exists';
+				message = `Error updating ${ this.modelName }: ${ e.meta.cause }`;
+			} else if(e.code === 'P2002') {
+				message = `${ this.modelName } already exists`;
 			}
 
 			res.respond({
@@ -258,40 +286,79 @@ export default class PrimateController {
 				message,
 			});
 		}
-	};
+	}
 
-	// Delete a record
+	/**
+	 * Deletes a record.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} req.params - Request parameters.
+	 * @param {string} req.params.id - The ID of the record to delete.
+	 * @param {Object} res - Express response object.
+	 * @returns {Object} - The response object.
+	 */
 	async delete(req, res) {
 		try {
+
+			const { id } = req.params;
+
+			if(!id) {
+				return res.respond({
+					status: 400,
+					message: 'ID is required to delete an item.',
+				});
+			}
 
 			let record;
 
 			if(typeof this.service?.delete === 'function') {
-
-				record = await this.service.delete(req.params.id, this.options);
+				record = await this.service.delete(id, this.options);
 			} else {
-
-				record = await PrimateService.delete(req.params.id, this.entity);
+				record = await PrimateService.delete(id, this.entity);
 			}
 
-			res.respond({
+			if(!record) {
+				return res.respond({
+					status: 404,
+					message: this.modelName + ' not found',
+				});
+			}
+
+			return res.respond({
 				data: record,
 				message: this.modelName + ' deleted successfully',
 			});
 		} catch(e) {
-			let message = 'Error deleting ' + this.modelName + ': ' + e.message;
-
-			res.respond({
-				status: 400,
-				message,
+			console.error('Error deleting record:', e);
+			return res.respond({
+				status: 500,
+				message: 'Error deleting ' + this.modelName + ': ' + e.message,
 			});
 		}
 	};
 
+	/**
+	 * Dynamically calls a service function based on the request.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} req.body - The body of the request.
+	 * @param {Object} res - Express response object.
+	 * @throws {Error} If any error occurs during the service call.
+	 */
 	async serviceCall(req, res) {
 		try {
-			// call the service dynamically
-			const result = await eval(`${ this.service }.${ this.function }`)(req);
+			const { service, functionName } = this;
+
+			if(!service || !functionName) {
+				throw new Error('Service and functionName are required.');
+			}
+
+			if(typeof service[functionName] !== 'function') {
+				throw new Error(`Function "${ functionName }" not found in the service.`);
+			}
+
+			// Call the service function dynamically
+			const result = await service[functionName](req);
 
 			res.respond({
 				data: result,
@@ -299,30 +366,61 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
-			let message = 'Error calling service: ' + e.message;
-
+			console.error(`Error calling service function "${ this.functionName }":`, e);
 			res.respond({
 				status: 400,
-				message,
+				message: `Error calling service: ${ e.message }`,
 			});
 		}
 	}
 
+	/**
+	 * Updates metadata for a record.
+	 *
+	 * @param {Object} req - Express request object.
+	 * @param {Object} req.params - Request parameters.
+	 * @param {string} req.params.id - The ID of the record to update.
+	 * @param {Object} req.body - The new metadata to update.
+	 * @param {Object} res - Express response object.
+	 * @returns {Object} - The response object.
+	 */
 	async updateMetas(req, res) {
 		try {
-			const record = await PrimateService.updateMetas(req.params.id, req.body, this.entity);
+			const { id } = req.params;
+			const data = req.body;
+
+			if(!id) {
+				return res.respond({
+					status: 400,
+					message: 'ID is required to update metadata.',
+				});
+			}
+
+			if(!data || typeof data !== 'object') {
+				return res.respond({
+					status: 400,
+					message: 'Data must be a non-empty object.',
+				});
+			}
+
+			const record = await PrimateService.updateMetas(id, data, this.entity);
+
+			if(!record) {
+				return res.respond({
+					status: 404,
+					message: this.modelName + ' not found',
+				});
+			}
 
 			res.respond({
 				data: record,
 				message: this.modelName + ' updated successfully',
 			});
 		} catch(e) {
-			let message = 'Error updating metas for ' + this.modelName + ': ' + e.message;
-
+			console.error('Error updating metadata:', e);
 			res.respond({
-				result: 'error',
-				status: 400,
-				message,
+				status: 500,
+				message: 'Error updating metas for ' + this.modelName + ': ' + e.message,
 			});
 		}
 	}
