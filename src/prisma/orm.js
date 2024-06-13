@@ -1,5 +1,6 @@
 import pluralize from 'pluralize';
 import { Prisma } from '@prisma/client';
+import chalk from 'chalk';
 
 /**
  * Generates an ORM object from the Prisma data model.
@@ -107,7 +108,7 @@ let PrismaOrmObject = null;
 try {
 	PrismaOrmObject = generatePrismaOrmObject();
 } catch(e) {
-	console.error('Failed to generate Prisma ORM object:', e);
+	console.log(chalk.white.bgRed('⚠️💎 Prisma does not exist. Please initialize it first if you want to use it.'));
 }
 
 export { PrismaOrmObject };
