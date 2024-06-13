@@ -100,6 +100,14 @@ const addOneToManyRelations = (obj, models, model) => {
 	});
 };
 
-const PrismaOrmObject = generatePrismaOrmObject();
+
+
+let PrismaOrmObject = null;
+
+try {
+	PrismaOrmObject = generatePrismaOrmObject();
+} catch(e) {
+	console.error('Failed to generate Prisma ORM object:', e);
+}
 
 export { PrismaOrmObject };
