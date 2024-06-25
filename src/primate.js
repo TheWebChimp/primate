@@ -19,7 +19,7 @@ class Primate {
 	}
 
 	/**
-	 * Use a middleware in the express app.
+	 * Use middleware in the express app.
 	 * @param  {...any} args - The middleware(s) to use.
 	 */
 	use(...args) {

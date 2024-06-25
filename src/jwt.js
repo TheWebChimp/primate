@@ -30,6 +30,7 @@ export default {
 			});
 		});
 	},
+
 	/**
 	 * Verifies an access token and returns the payload.
 	 *
@@ -55,6 +56,7 @@ export default {
 			});
 		});
 	},
+
 	/**
 	 * Signs a recovery token using the given payload and expiration time.
 	 *
@@ -85,6 +87,7 @@ export default {
 			});
 		});
 	},
+
 	/**
 	 * Verifies a recovery token and returns the payload.
 	 *
