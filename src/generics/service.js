@@ -361,9 +361,13 @@ class PrimateService {
 		}
 
 		// Handle fetch relations via query
-		const fetchKey = Object.keys(query).find(key => key.startsWith('fetch-'));
-		if(fetchKey) {
+		// find all object keys that start with fetch-
+		const fetchKeys = Object.keys(query).filter(key => key.startsWith('fetch-'));
 
+		// order the keys alphabetically
+		fetchKeys.sort();
+
+		for(const fetchKey of fetchKeys) {
 			const entity = fetchKey.replace('fetch-', '');
 			const value = query[fetchKey];
 
@@ -377,6 +381,14 @@ class PrimateService {
 					[entityCamel]: value === 1 ? true : { include: { [value]: true } },
 				};
 			}
+		}
+
+		// add options.include to the args.include
+		if(options.include) {
+			args.include = {
+				...args.include,
+				...options.include,
+			};
 		}
 
 		// Retrieve data
