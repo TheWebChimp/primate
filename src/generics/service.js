@@ -4,6 +4,7 @@ import Controller from './controller.js';
 import slugify from 'slugify';
 import prisma from '../prisma/client.js';
 import chalk from 'chalk';
+import * as changeCase from 'change-case';
 
 /**
  * Generic service class for handling CRUD operations.
@@ -367,11 +368,13 @@ class PrimateService {
 			const value = query[fetchKey];
 
 			// convert the entity case to camelCase
+			const entityCamel = changeCase.camelCase(entity);
+			// check if entity
 
-			if(PrismaOrmObject[model].hasOwnProperty(entity)) {
+			if(PrismaOrmObject[model].hasOwnProperty(entityCamel)) {
 				args.include = {
 					...args.include,
-					[entity]: value === 1 ? true : { include: { [value]: true } },
+					[entityCamel]: value === 1 ? true : { include: { [value]: true } },
 				};
 			}
 		}
