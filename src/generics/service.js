@@ -362,9 +362,17 @@ class PrimateService {
 		// Handle fetch relations via query
 		const fetchKey = Object.keys(query).find(key => key.startsWith('fetch-'));
 		if(fetchKey) {
+
 			const entity = fetchKey.replace('fetch-', '');
+			const value = query[fetchKey];
+
+			// convert the entity case to camelCase
+
 			if(PrismaOrmObject[model].hasOwnProperty(entity)) {
-				args.include = { ...args.include, [entity]: true };
+				args.include = {
+					...args.include,
+					[entity]: value === 1 ? true : { include: { [value]: true } },
+				};
 			}
 		}
 
