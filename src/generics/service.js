@@ -300,13 +300,14 @@ class PrimateService {
 		// iterate over the model fields
 		Object.entries(PrismaOrmObject[model]).forEach(([ field ]) => {
 			if(query[field]) {
+
 				// check if the field has a comma, if so, split it
-				if(query[field].includes(',')) {
+				if(typeof query[field] === 'string' && query[field].includes(',')) {
 
 					queryObject.where[field] = {
 						in: query[field].split(','),
 					};
-				} else if(query[field].includes('|')) {
+				} else if(typeof query[field] === 'string' && query[field].includes('|')) {
 
 					queryObject.where[field] = {
 						has: query[field].split('|'),
