@@ -184,7 +184,7 @@ export default class PrimateController {
 	 */
 	async get(req, res) {
 		try {
-			const service = this.service?.get && this.service?.get === 'function' ? this.service : PrimateService;
+			const service = this.service?.get && typeof this.service?.get === 'function' ? this.service : PrimateService;
 			const record = await service.get(req.params.id, this.entity, req.query, this.options);
 
 			if(typeof this.service?.get !== 'function') {
