@@ -458,6 +458,11 @@ class PrimateService {
 			args.include = include;
 		}
 
+		// Include relations
+		if(!!options.include) {
+			args.include = {...args.include, ...options.include};
+		}
+
 		// Check if we are fetching a relation via query
 		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch-'));
 		fetchs.forEach(fetch => {
