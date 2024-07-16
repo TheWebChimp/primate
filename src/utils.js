@@ -204,6 +204,21 @@ function requiredFields(fields = {}) {
 	return null;
 }
 
+
+async function validateSchema(entity, data) {
+	// get the schema js file from ./entities/{entity}/{entity}.schema.js
+	const schemaPath = path.join(process.cwd(), '..', 'entities', entity, `${ entity }.schema.js`);
+
+	// if the file does not exist, return true
+	if(!fs.existsSync(schemaPath)) return true;
+
+	// import the schema file
+	const schema = await import(`file://${ schemaPath }`);
+
+	// validate the data against the schema
+	return await schema.validateAsync(data);
+}
+
 // Export the functions
 export {
 	importRoutes,

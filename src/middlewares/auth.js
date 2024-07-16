@@ -4,10 +4,7 @@ import jwt from '../jwt.js';
  * Authentication middleware to verify JWT tokens.
  *
  * @param {Object} req - Express request object.
- * @param {Object} req.headers - Request headers.
- * @param {string} req.headers.authorization - Authorization header containing the JWT token.
  * @param {Object} res - Express response object.
- * @param {Function} res.respond - Custom response function to send the response.
  * @param {Function} next - Express next middleware function.
  * @throws {Error} If any error occurs during token verification.
  */
