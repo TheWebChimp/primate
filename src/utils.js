@@ -225,8 +225,6 @@ async function validateSchema(entity, data) {
 		return true;
 	}
 
-	console.log(schema.default.validateAsync(data));
-
 	try {
 		// validate the data against the schema
 		await schema.default.validateAsync(data);
