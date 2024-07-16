@@ -1,6 +1,6 @@
 {
 	"name": "@thewebchimp/primate",
-	"version": "1.2.9-entities",
+	"version": "1.3.0-entities",
 	"description": "Framework built on top of Express and Prisma to get your project going",
 	"main": "./src/index.js",
 	"exports": "./src/index.js",
