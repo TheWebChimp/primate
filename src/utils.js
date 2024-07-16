@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import createError from 'http-errors';
 import chalk from 'chalk';
+import pluralize from 'pluralize';
 
 /**
  * Asynchronously imports route modules from a specified directory.
@@ -207,16 +208,31 @@ function requiredFields(fields = {}) {
 
 async function validateSchema(entity, data) {
 	// get the schema js file from ./entities/{entity}/{entity}.schema.js
-	const schemaPath = path.join(process.cwd(), '..', 'entities', entity, `${ entity }.schema.js`);
+	const schemaPath = path.join(process.cwd(), 'entities', pluralize(entity), `${ entity }.schema.js`);
 
 	// if the file does not exist, return true
-	if(!fs.existsSync(schemaPath)) return true;
+	if(!fs.existsSync(schemaPath)) {
+		console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file not found for entity "${ entity }"`);
+		return true;
+	}
 
 	// import the schema file
 	const schema = await import(`file://${ schemaPath }`);
 
-	// validate the data against the schema
-	return await schema.validateAsync(data);
+	// check that schema is a Joi object
+	if(typeof schema.default !== 'object') {
+		console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file for entity "${ entity }" does not export a Joi object`);
+		return true;
+	}
+
+	console.log(schema.default.validateAsync(data));
+
+	try {
+		// validate the data against the schema
+		await schema.default.validateAsync(data);
+	} catch(error) {
+		throw createError.BadRequest(`Schema validation failed: ${ error.message }`);
+	}
 }
 
 // Export the functions
@@ -225,4 +241,5 @@ export {
 	setupRoutes,
 	importEntities,
 	requiredFields,
+	validateSchema
 };
