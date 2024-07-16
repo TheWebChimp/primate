@@ -83,7 +83,7 @@ async function importEntities(directory) {
 				// Add the router to the entities object
 				entities[entityName] = router;
 			} catch(err) {
-				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `There's no route file found for entity "${ file }":`, err.message);
+				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `There's no route file found for entity "${ file }":`, err.name, err.message);
 			}
 		}
 	} catch(error) {
@@ -205,7 +205,6 @@ function requiredFields(fields = {}) {
 	return null;
 }
 
-
 async function validateSchema(entity, data) {
 	// get the schema js file from ./entities/{entity}/{entity}.schema.js
 	const schemaPath = path.join(process.cwd(), 'entities', pluralize(entity), `${ entity }.schema.js`);
@@ -213,7 +212,7 @@ async function validateSchema(entity, data) {
 	// if the file does not exist, return true
 	if(!fs.existsSync(schemaPath)) {
 		console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file not found for entity "${ entity }"`);
-		return true;
+		return data;
 	}
 
 	// import the schema file
@@ -222,12 +221,13 @@ async function validateSchema(entity, data) {
 	// check that schema is a Joi object
 	if(typeof schema.default !== 'object') {
 		console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file for entity "${ entity }" does not export a Joi object`);
-		return true;
+		return data;
 	}
 
 	try {
 		// validate the data against the schema
-		await schema.default.validateAsync(data);
+		return await schema.default.validateAsync(data);
+
 	} catch(error) {
 		throw createError.BadRequest(`Schema validation failed: ${ error.message }`);
 	}
@@ -239,5 +239,5 @@ export {
 	setupRoutes,
 	importEntities,
 	requiredFields,
-	validateSchema
+	validateSchema,
 };

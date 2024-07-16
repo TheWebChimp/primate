@@ -5,6 +5,7 @@ import slugify from 'slugify';
 import prisma from '../prisma/client.js';
 import chalk from 'chalk';
 import * as changeCase from 'change-case';
+import { validateSchema } from '../utils.js';
 
 /**
  * Generic service class for handling CRUD operations.
@@ -27,6 +28,12 @@ class PrimateService {
 	 * @throws {Error} If any error occurs during creation.
 	 */
 	static async create(data, model, options = {}) {
+
+		try {
+			data = await validateSchema(model, data);
+		} catch(e) {
+			throw new Error(e.message);
+		}
 
 		if(!model) throw new Error('Model is required to create an item.');
 
@@ -460,7 +467,7 @@ class PrimateService {
 
 		// Include relations
 		if(!!options.include) {
-			args.include = {...args.include, ...options.include};
+			args.include = { ...args.include, ...options.include };
 		}
 
 		// Check if we are fetching a relation via query
