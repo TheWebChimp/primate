@@ -535,8 +535,9 @@ class PrimateService {
 	 *
 	 * @param {Express.Router} router - The Express router.
 	 * @param {string|Object} model - The model name or an instance of a model controller.
+	 * @param options - Optional parameters.
 	 */
-	static prepareCrUDAGRoutes(router, model) {
+	static prepareCrUDAGRoutes(router, model, options = {}) {
 		if(!router || typeof router !== 'function' || typeof router.get !== 'function') {
 			throw new Error('A valid Express router is required.');
 		}
@@ -546,13 +547,21 @@ class PrimateService {
 
 		const controller = typeof model === 'string' ? new Controller(model) : model;
 
+		const bypassMiddleware = (req, res, next) => next();
+		const createAuth = options.disableAuth || options.disableCreateAuth ? bypassMiddleware : auth;
+		const updateAuth = options.disableAuth || options.disableUpdateAuth ? bypassMiddleware : auth;
+		const deleteAuth = options.disableAuth || options.disableDeleteAuth ? bypassMiddleware : auth;
+		const allAuth = options.disableAuth || options.disableAllAuth ? bypassMiddleware : auth;
+		const getAuth = options.disableAuth || options.disableGetAuth ? bypassMiddleware : auth;
+		const metasAuth = options.disableAuth || options.disableMetasAuth ? bypassMiddleware : auth;
+
 		router.get('/crudag', (req, res) => res.status(200).send('OK'));
-		router.post('/', auth, controller.create.bind(controller));
-		router.put('/:id', auth, controller.update.bind(controller));
-		router.delete('/:id', auth, controller.delete.bind(controller));
-		router.get('/', auth, controller.all.bind(controller));
-		router.get('/:id', auth, controller.get.bind(controller));
-		router.put('/:id/metas', auth, controller.updateMetas.bind(controller));
+		router.post('/', createAuth, controller.create.bind(controller));
+		router.put('/:id', updateAuth, controller.update.bind(controller));
+		router.delete('/:id', deleteAuth, controller.delete.bind(controller));
+		router.get('/', allAuth, controller.all.bind(controller));
+		router.get('/:id', getAuth, controller.get.bind(controller));
+		router.put('/:id/metas', metasAuth, controller.updateMetas.bind(controller));
 	}
 
 	/**
