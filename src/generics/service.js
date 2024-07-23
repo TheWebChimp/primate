@@ -290,7 +290,11 @@ class PrimateService {
 
 				options.queryableFields.forEach(field => {
 					if(modelFields.hasOwnProperty(field)) {
-						queryObject.where.OR.push({ [field]: { contains: q } });
+						if(modelFields[field].type === 'Int' && !isNaN(parseInt(q))) {
+							queryObject.where.OR.push({ [field]: parseInt(q) });
+						} else if(modelFields[field].type === 'String') {
+							queryObject.where.OR.push({ [field]: { contains: String(q) } });
+						}
 					} else if(field.includes('.')) {
 						const [ relation, subfield ] = field.split('.');
 						if(modelFields.hasOwnProperty(relation)) {
