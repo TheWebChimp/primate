@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://thewebchimp.github.io/primate/sitemap.xml.gz
