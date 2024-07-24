@@ -4,28 +4,52 @@ import Controller from './controller.js';
 import slugify from 'slugify';
 import prisma from '../prisma/client.js';
 import chalk from 'chalk';
+import * as changeCase from 'change-case';
+import { validateSchema } from '../utils.js';
 
+/**
+ * Generic service class for handling CRUD operations.
+ */
 class PrimateService {
 
 	// The functions are in the following order: CrUDAG
 	// Create, Update, Delete, All, Get
 
 	// Create ----------------------------------------------------------------------------------------------------------
-	static async create(data, model, options) {
+	/**
+	 * Creates a new record in the database.
+	 *
+	 * @param {Object} data - The data to be created.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Function} [options.filterCreateData] - Function to filter create data.
+	 * @param {Object} [options.upsertRules] - Rules for upsert operations.
+	 * @returns {Promise<Object>} The created record.
+	 * @throws {Error} If any error occurs during creation.
+	 */
+	static async create(data, model, options = {}) {
+
+		try {
+			data = await validateSchema(model, data);
+		} catch(e) {
+			throw new Error(e.message);
+		}
 
 		if(!model) throw new Error('Model is required to create an item.');
+
+		// convert the first letter of the model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
 
 			if(options.filterCreateData) data = await options.filterCreateData(data, model, options);
 
-			// Check relations to see if we need to connect
-			// first get the fields of the model
-			const modelFields = PrismaOrmObject[model];
-			const relations = modelFields['relations'] || null;
+			// Get the fields of the model
+			const modelFields = PrimateService.getORMObject(model);
+			const relations = modelFields.relations || null;
 
 			if(relations) {
-				// iterate over relations
+				// Handle one-to-many and many-to-many relations
 				for(const [ relation, relationData ] of Object.entries(relations)) {
 					if(relationData.type === 'one-to-many' && !!data[relationData.field]) {
 						data[relationData.model] = {
@@ -38,61 +62,61 @@ class PrimateService {
 					}
 
 					if(relationData.type === 'many-to-many' && !!data[relationData.plural]) {
-						// check if the relation is an object
 						if(Array.isArray(data[relationData.plural])) {
-
-							// check if the relation is an array of objects with id
-							if(typeof data[relationData.plural][0] === 'object' && data[relationData.plural][0].hasOwnProperty('id')) {
-
-								data[relationData.plural] = {
-									connect: data[relationData.plural].map((item) => ({ id: parseInt(item.id) })),
-								};
-
-							} else {
-								// check if the relation is an array with plain ids
-								data[relationData.plural] = {
-									connect: data[relationData.plural].map((item) => ({ id: parseInt(item) })),
-								};
-							}
+							data[relationData.plural] = {
+								connect: data[relationData.plural].map(item =>
+									typeof item === 'object' && item.hasOwnProperty('id')
+										? { id: parseInt(item.id, 10) }
+										: { id: parseInt(item, 10) },
+								),
+							};
 						}
 					}
 				}
 			}
 
-			// Sanitize data to avoid errors removing the fields that are not in the model
+			// Sanitize data to avoid errors
 			data = this.sanitizeData(data, model);
 
-			// Check if options.upsertRules is set
-			if(options && options.upsertRules) {
-				// iterate over the rules
+			// Handle upsert rules if set
+			if(options.upsertRules) {
 				for(const [ field, rule ] of Object.entries(options.upsertRules)) {
-					// slugify
-					if(rule.slugify) {
-						// check if the field exists
-						if(data[rule.slugify]) {
-							// slugify the field
-							data[field] = slugify(data[rule.slugify], {
-								lower: true,
-							});
-						}
+					if(rule.slugify && data[rule.slugify]) {
+						data[field] = slugify(data[rule.slugify], {
+							lower: true,
+						});
 					}
 				}
 			}
 
-			return await prisma[model].create({
-				data,
-			});
+			return await prisma[model].create({ data });
 
 		} catch(e) {
-			throw e;
+			console.error('Error creating record:', e);
+			throw new Error(`Error creating ${ model }: ${ e.message }`);
 		}
 	}
 
 	// Update ----------------------------------------------------------------------------------------------------------
-	static async update(id, data, model, options) {
+	/**
+	 * Updates a record in the database.
+	 *
+	 * @param {number|string} id - The ID of the record to update.
+	 * @param {Object} data - The data to update.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Function} [options.filterUpdateData] - Function to filter update data.
+	 * @param {string} [options.searchField] - Field to search for the record if ID is not a number.
+	 * @returns {Promise<Object>} The updated record.
+	 * @throws {Error} If any error occurs during the update.
+	 */
+	static async update(id, data, model, options = {}) {
 
 		if(!id) throw new Error('ID is required to update an item.');
 		if(!model) throw new Error('Model is required to update an item.');
+
+		// convert first letter of model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
 
 		try {
 
@@ -178,70 +202,105 @@ class PrimateService {
 			// Sanitize data to avoid errors removing the fields that are not in the model
 			data = this.sanitizeData(data, model);
 
-			return await prisma[model].update({
-				where: { id: parseInt(id) },
-				data,
-			});
+			let where;
+			// if option.searchFields exists && id is not a number
+			if(options.searchField && isNaN(parseInt(id))) {
+				// check if the model has the field
+				if(modelFields.hasOwnProperty(options.searchField)) {
+					where = {
+						[options.searchField]: modelFields[options.searchField].type === 'Int' ? parseInt(id) : id,
+					};
+				}
+			} else {
+				where = { id: PrimateService.resolveId(id, model) };
+			}
+
+			return await prisma[model].update({ where, data });
 		} catch(e) {
 			throw e;
 		}
 	}
 
 	// Delete ----------------------------------------------------------------------------------------------------------
+	/**
+	 * Deletes a record by its ID from the specified model.
+	 *
+	 * @param {number|string} id - The ID of the record to delete.
+	 * @param {string} model - The name of the model.
+	 * @returns {Promise<Object>} The deleted record.
+	 * @throws {Error} If any required parameter is missing or an error occurs during deletion.
+	 */
 	static async delete(id, model) {
+
+		if(!id) throw new Error('ID is required to delete an item.');
+		if(!model || typeof model !== 'string') throw new Error('Model is required to delete an item.');
+
+		// Convert the first letter of the model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
+
+		const ormObject = PrimateService.getORMObject(model);
+		if(!ormObject) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
 		try {
-			return await prisma[model].delete({ where: { id: parseInt(id) } });
+			return await prisma[model].delete({ where: PrimateService.resolveWhere(id, model) });
 		} catch(e) {
-			throw e;
+			console.error(`Error deleting ${ model } with ID ${ id }:`, e);
+			throw new Error(`Error deleting ${ model }: ${ e.message }`);
 		}
 	}
 
 	// All -------------------------------------------------------------------------------------------------------------
+	/**
+	 * Retrieves a list of records from the specified model based on query parameters.
+	 *
+	 * @param {string} model - The name of the model.
+	 * @param {Object} query - The query parameters.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @returns {Promise<Object>} The retrieved records and their count.
+	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
+	 */
 	static async all(model, query, options = {}) {
 
-		// Query param
-		let { page, limit, by, order, q } = query;
-
-		// if the page is not set, set it to 1
-		page = page || 1;
-
-		// if the limit is not set, set it to 10
-		limit = limit || 100;
-
-		order = order || 'desc';
-		by = by || 'id';
-
-		// If we have params, prepare them for the query
-		let queryObject = {
-			where: {},
-		};
-
-		if(by && order) {
-			queryObject.orderBy = {
-				[by]: order,
-			};
+		if(!model || typeof model !== 'string') {
+			throw new Error('Model is required to get items.');
 		}
 
-		if(q) {
-			// check there are queryable fields
-			if(options.queryableFields) {
-				queryObject.where = {
-					OR: [],
-				};
+		// Default values for pagination and sorting
+		let { page = 1, limit = 100, by = 'id', order = 'desc', q, count: countQuery, select } = query;
 
-				// if id is not nan, add it to the query
+		// Prepare the query object
+		let queryObject = {
+			where: {},
+			orderBy: { [by]: order },
+		};
+
+		// Handle search query (q)
+		if(q) {
+			if(options.queryableFields) {
+				queryObject.where.OR = [];
+
+				// Add ID to search if it is a number
 				if(!isNaN(parseInt(q))) {
-					queryObject.where.OR.push({
-						id: parseInt(q),
-					});
+					queryObject.where.OR.push({ id: parseInt(q) });
 				}
 
+				const modelFields = PrimateService.getORMObject(model);
+
 				options.queryableFields.forEach(field => {
-					queryObject.where.OR.push({
-						[field]: {
-							contains: q,
-						},
-					});
+					if(modelFields.hasOwnProperty(field)) {
+						if(modelFields[field] === 'Int' && !isNaN(parseInt(q))) {
+							queryObject.where.OR.push({ [field]: parseInt(q) });
+						} else if(modelFields[field] === 'String') {
+							queryObject.where.OR.push({ [field]: { contains: String(q) } });
+						}
+					} else if(field.includes('.')) {
+						const [ relation, subfield ] = field.split('.');
+						if(modelFields.hasOwnProperty(relation)) {
+							queryObject.where.OR.push({ [relation]: { [subfield]: { contains: q } } });
+						}
+					}
 				});
 			}
 		}
@@ -250,227 +309,457 @@ class PrimateService {
 		// if so, add it to the query
 
 		// iterate over the model fields
-		for(const [ field, value ] of Object.entries(PrismaOrmObject[model])) {
-			// check if the query has a field that matches the model field
+		Object.entries(PrismaOrmObject[model]).forEach(([ field ]) => {
 			if(query[field]) {
-				// add the field to the query
-				queryObject.where[field] = query[field];
-			}
-		}
 
-		// remove deleted elements
+				// check if the field has a comma, if so, split it
+				if(typeof query[field] === 'string' && query[field].includes(',')) {
+
+					queryObject.where[field] = {
+						in: query[field].split(','),
+					};
+				} else if(typeof query[field] === 'string' && query[field].includes('|')) {
+
+					queryObject.where[field] = {
+						has: query[field].split('|'),
+					};
+				} else {
+
+					queryObject.where[field] = query[field];
+				}
+			}
+		});
+
+		// Merge additional where conditions from options
 		queryObject.where = {
-			...options.where || {},
+			...options.where,
 			...queryObject.where,
 		};
 
-		if(!!options.filterAllQuery) {
-			const filterAllQueryObject = await options.filterAllQuery(query, queryObject, options);
-			if(filterAllQueryObject) queryObject = filterAllQueryObject;
+		// Allow customization of the query object
+		if(options.filterAllQuery) {
+			queryObject = await options.filterAllQuery(query, queryObject, options) || queryObject;
 		}
 
-		// Get count of all courses under the query
-		const count = await prisma[model].count(queryObject);
+		// Count total records
+		const totalCount = await prisma[model].count(queryObject);
 
-		if(query.count) return { data: [], count };
+		if(countQuery) return { data: [], count: totalCount };
 
+		// Prepare arguments for findMany
 		const args = {
 			...queryObject,
 			skip: (parseInt(page) - 1) * parseInt(limit),
 			take: parseInt(limit),
 		};
 
-		if(options.include) args.include = options.include;
+		// Include relations
+		if(options.include) {
+			args.include = options.include;
+		}
 
-		if(query.select) {
-
+		// Handle select fields
+		if(select) {
 			args.select = {};
+			const selectFields = select.includes(',') ? select.split(',') : [ select ];
 
-			// check if select is a comma separated string
-			if(query.select.includes(',')) {
-				query.select = query.select.split(',');
-			}
-
-			// iterate PrismaOrmObject[model] and remove from query.select
-			// the fields that are in the select but are not in the model
-			query.select.forEach(field => {
-				if(!PrismaOrmObject[model].hasOwnProperty(field)) {
-					query.select.splice(query.select.indexOf(field), 1);
-					// log a warning
+			selectFields.forEach(field => {
+				if(PrismaOrmObject[model].hasOwnProperty(field)) {
+					args.select[field] = true;
+				} else {
 					console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
 				}
 			});
-
-			query.select.forEach(field => { args.select[field] = true; });
 		}
 
-		// check if we are fetching a relation via query, it would be of type "fetch_[entity]"
-		// check if the query has a key that starts with "fetch_"
-		const fetch = Object.keys(query).filter(key => key.startsWith('fetch-'))[0];
+		// Handle fetch relations via query
+		// find all object keys that start with fetch-
+		const fetchKeys = Object.keys(query).filter(key => key.startsWith('fetch-'));
 
-		if(fetch) {
-			// remove the "fetch_" part
+		// order the keys alphabetically
+		fetchKeys.sort();
+
+		for(const fetchKey of fetchKeys) {
+			const entity = fetchKey.replace('fetch-', '');
+			const value = query[fetchKey];
+
+			// convert the entity case to camelCase
+			const entityCamel = changeCase.camelCase(entity);
+			// check if entity
+
+			if(PrismaOrmObject[model].hasOwnProperty(entityCamel)) {
+				args.include = {
+					...args.include,
+					[entityCamel]: value === 1 ? true : { include: { [value]: true } },
+				};
+			}
+		}
+
+		// add options.include to the args.include
+		if(options.include) {
+			args.include = {
+				...args.include,
+				...options.include,
+			};
+		}
+
+		// Retrieve data
+		try {
+			let data = await prisma[model].findMany(args);
+			if(options.filterResultData) {
+				data = await options.filterResultData(data, query);
+			}
+			return { data, count: totalCount };
+		} catch(e) {
+			console.error(`Error retrieving ${ model }:`, e);
+			throw new Error(`Error retrieving ${ model }: ${ e.message }`);
+		}
+	}
+
+	// Get -------------------------------------------------------------------------------------------------------------
+	/**
+	 * Retrieves a record from the database based on the given ID and model.
+	 *
+	 * @param {number|string} id - The ID of the record to retrieve.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [query={}] - The query parameters.
+	 * @param {Object} [options={}] - Optional parameters.
+	 * @param {Function} [options.resolveWhere] - Function to resolve the where clause.
+	 * @param {string[]} [options.searchField] - Fields to search if ID is not a number.
+	 * @param {Function} [options.filterGetItem] - Function to filter the retrieved item.
+	 * @returns {Promise<Object|null>} The retrieved record, or null if no record is found.
+	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
+	 */
+	static async get(id, model, query = {}, options = {}) {
+
+		if(!id) throw new Error('ID is required to get an item.');
+		if(!model || typeof model !== 'string') throw new Error('Model is required to get an item.');
+
+		// Convert the first letter of the model to lowercase
+		model = model[0].toLowerCase() + model.slice(1);
+
+		const modelFields = PrismaOrmObject[model];
+		if(!modelFields) throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+
+		const args = {};
+
+		if(options.resolveWhere) {
+			args.where = options.resolveWhere(id, model);
+		} else {
+			if(options.searchField && isNaN(parseInt(id, 10))) {
+				const toSearch = options.searchField
+					.filter(field => modelFields.hasOwnProperty(field))
+					.map(field => ({
+						[field]: modelFields[field].type === 'Int' ? parseInt(id, 10) : id,
+					}));
+
+				if(toSearch.length === 1) {
+					args.where = toSearch[0];
+				} else {
+					args.where = { OR: toSearch };
+				}
+			} else {
+				args.where = PrimateService.resolveWhere(id, model);
+			}
+		}
+
+		// Get the "include" parameter from the query
+		const include = query.include || null;
+		if(include) {
+			args.include = include;
+		}
+
+		// Include relations
+		if(!!options.include) {
+			args.include = { ...args.include, ...options.include };
+		}
+
+		// Check if we are fetching a relation via query
+		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch-'));
+		fetchs.forEach(fetch => {
 			const entity = fetch.replace('fetch-', '');
-			// check if the entity exists
-			if(PrismaOrmObject[model].hasOwnProperty(entity)) {
-				// add the entity to the "include"
+			if(modelFields.hasOwnProperty(entity)) {
 				args.include = {
 					...args.include,
 					[entity]: true,
 				};
 			}
-		}
+		});
 
-		// Get courses under the query
 		try {
-
-			let data = await prisma[model].findMany(args);
-
-			if(!!options.filterResultData) data = await options.filterResultData(data, query);
-
-			return {
-				data,
-				count,
-			};
-		} catch(e) {
-			console.log(e);
-		}
-
-	}
-
-	// Get -------------------------------------------------------------------------------------------------------------
-	static async get(id, model, query = {}, options = {}) {
-
-		const args = {};
-
-		if(!model) throw new Error('Model is required to get an item.');
-
-		if(options.resolveWhere) args.where = options.resolveWhere(id, model);
-		else args.where = PrimateService.resolveWhere(id, model);
-
-		// get the "include" parameter from the query
-		let include = query.include || null;
-
-		if(include) args.include = include;
-
-		// check if we are fetching a relation via query, it would be of type "fetch_[entity]"
-		// check if query has a key that starts with "fetch_"
-		const fetchs = Object.keys(query).filter(key => key.startsWith('fetch'));
-
-		if(fetchs) {
-			for(const fetch of fetchs) {
-				// remove the "fetch_" part
-				const entity = fetch.replace('fetch-', '');
-				// check if the entity exists
-				if(PrismaOrmObject[model].hasOwnProperty(entity)) {
-					// add the entity to the include
-					args.include = {
-						...args.include,
-						[entity]: true,
-					};
-				}
+			let get = await prisma[model].findFirst(args);
+			if(options.filterGetItem) {
+				get = await options.filterGetItem(get, query);
 			}
-		}
-
-		try {
-			let get = await prisma[model].findUnique(args);
-			if(!!options.filterGetItem) get = await options.filterGetItem(get, query);
 			return get;
-
 		} catch(e) {
-			throw e;
+			console.error(`Error retrieving ${ model } with ID ${ id }:`, e);
+			throw new Error(`Error retrieving ${ model }: ${ e.message }`);
 		}
 	}
 
 	// Other functions -------------------------------------------------------------------------------------------------
 
+	/**
+	 * Sanitizes the data by removing fields that are not in the model.
+	 *
+	 * @param {Object} data - The data to be sanitized.
+	 * @param {string} model - The name of the model.
+	 * @returns {Object} The sanitized data.
+	 * @throws {Error} If the model is not found or the parameters are invalid.
+	 */
 	static sanitizeData(data, model) {
+		// Validate parameters
+		if(!data || typeof data !== 'object') {
+			throw new Error('The "data" parameter must be a non-empty object.');
+		}
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
 
-		// Sanitize data to avoid errors removing the fields that are not in the model
+		const modelObject = PrismaOrmObject[model];
+		if(!modelObject) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
+		// Sanitize data by removing fields that are not in the model
 		for(const [ field, value ] of Object.entries(data)) {
-			if(!PrismaOrmObject[model].hasOwnProperty(field)) {
+			if(!modelObject.hasOwnProperty(field)) {
 				delete data[field];
-				// log a warning
+				// Log a warning
 				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
 			}
 		}
 
 		return data;
-
 	}
 
-	// Receive router by reference
-	static prepareCrUDAGRoutes(router, model) {
+	/**
+	 * Prepares CRUD and additional routes for a given model.
+	 *
+	 * @param {Express.Router} router - The Express router.
+	 * @param {string|Object} model - The model name or an instance of a model controller.
+	 * @param options - Optional parameters.
+	 */
+	static prepareCrUDAGRoutes(router, model, options = {}) {
+		if(!router || typeof router !== 'function' || typeof router.get !== 'function') {
+			throw new Error('A valid Express router is required.');
+		}
+		if(!model) {
+			throw new Error('Model is required to prepare routes.');
+		}
 
-		if(typeof model === 'string') {
+		const controller = typeof model === 'string' ? new Controller(model) : model;
 
-			const controller = new Controller(model);
+		const bypassMiddleware = (req, res, next) => next();
+		const createAuth = options.disableAuth || options.disableCreateAuth ? bypassMiddleware : auth;
+		const updateAuth = options.disableAuth || options.disableUpdateAuth ? bypassMiddleware : auth;
+		const deleteAuth = options.disableAuth || options.disableDeleteAuth ? bypassMiddleware : auth;
+		const allAuth = options.disableAuth || options.disableAllAuth ? bypassMiddleware : auth;
+		const getAuth = options.disableAuth || options.disableGetAuth ? bypassMiddleware : auth;
+		const metasAuth = options.disableAuth || options.disableMetasAuth ? bypassMiddleware : auth;
 
-			router.get('/crudag', (req, res) => res.send('OK').status(200));
-			router.post('/', auth, controller.create.bind(controller));
-			router.put('/:id', auth, controller.update.bind(controller));
-			router.delete('/:id', auth, controller.delete.bind(controller));
-			router.get('/', auth, controller.all.bind(controller));
-			router.get('/:id', auth, controller.get.bind(controller));
-			router.put('/:id/metas', auth, controller.updateMetas.bind(controller));
+		router.get('/crudag', (req, res) => res.status(200).send('OK'));
+		router.post('/', createAuth, controller.create.bind(controller));
+		router.put('/:id', updateAuth, controller.update.bind(controller));
+		router.delete('/:id', deleteAuth, controller.delete.bind(controller));
+		router.get('/', allAuth, controller.all.bind(controller));
+		router.get('/:id', getAuth, controller.get.bind(controller));
+		router.put('/:id/metas', metasAuth, controller.updateMetas.bind(controller));
+	}
 
-		} else {
+	/**
+	 * Updates the metadata for a record in the database.
+	 *
+	 * @param {number|string} id - The ID of the record to update.
+	 * @param {Object} metas - The new metadata to update.
+	 * @param {string} model - The name of the model.
+	 * @returns {Promise<Object>} The updated record.
+	 * @throws {Error} If any error occurs during the update.
+	 */
+	static async updateMetas(id, metas, model) {
 
-			router.get('/crudag', (req, res) => res.send('OK').status(200));
-			router.post('/', auth, model.create.bind(model));
-			router.put('/:id', auth, model.update.bind(model));
-			router.delete('/:id', auth, model.delete.bind(model));
-			router.get('/', auth, model.all.bind(model));
-			router.get('/:id', auth, model.get.bind(model));
-			router.put('/:id/metas', auth, model.updateMetas.bind(model));
+		if(!id) {
+			throw new Error('ID is required to update metadata.');
+		}
+		if(!metas || typeof metas !== 'object') {
+			throw new Error('The "metas" parameter must be a non-empty object.');
+		}
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
+
+		try {
+			// Get the current metadata from the model
+			const currentMetas = await prisma[model].findUnique({
+				where: PrimateService.resolveWhere(id, model),
+				select: { metas: true },
+			});
+
+			if(!currentMetas) {
+				throw new Error(`${ model } with ID ${ id } not found.`);
+			}
+
+			// Merge the current metadata with the new metadata
+			const mergedMetas = {
+				...currentMetas.metas,
+				...metas,
+			};
+
+			// Update the metadata
+			return await prisma[model].update({
+				where: PrimateService.resolveWhere(id, model),
+				data: { metas: mergedMetas },
+			});
+		} catch(e) {
+			console.error(`Error updating metadata for ${ model } with ID ${ id }:`, e);
+			throw new Error(`Error updating metadata: ${ e.message }`);
 		}
 	}
 
-	static async updateMetas(id, metas, model) {
-
-		// get the metas from the model
-		const currentMetas = await prisma[model].findUnique({
-			where: { id: parseInt(id) },
-			select: {
-				metas: true,
-			},
-		});
-
-		// merge the metas
-		const mergedMetas = {
-			...currentMetas.metas,
-			...metas,
-		};
-
-		// update the metas
-		return prisma[model].update({
-			where: { id: parseInt(id) },
-			data: {
-				metas: mergedMetas,
-			},
-		});
-	}
-
+	/**
+	 * Resolves the where clause for a given ID and model.
+	 *
+	 * @param {number|string} id - The ID of the record.
+	 * @param {string} model - The name of the model.
+	 * @returns {Object} The where clause for querying the database.
+	 * @throws {Error} If the model is not found or the ID is invalid.
+	 */
 	static resolveWhere(id, model) {
+		if(!id) {
+			throw new Error('ID is required to resolve where clause.');
+		}
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
+
+		const modelObject = PrismaOrmObject[model];
+		if(!modelObject) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
 		// check if id is a number
 		let where = {};
 
-		if(isNaN(parseInt(id))) {
-			// check if the model has a field called uid
-			if(typeof PrismaOrmObject[model].uid !== 'undefined') {
+		if(isNaN(parseInt(id, 10))) {
+			// Check if the model has a field called uid
+			if(modelObject.hasOwnProperty('uid')) {
 				where = { uid: id };
+			} else {
+				throw new Error(`Model "${ model }" does not have a "uid" field.`);
 			}
 		} else {
-			where = { id: parseInt(id) };
+			where = { id: PrimateService.resolveId(id, model) };
 		}
 
 		return where;
 	}
 
-	static findById(id, model) {
-		return prisma[model].findUnique({
-			where: { id },
-		});
+	/**
+	 * Retrieves the ORM object for a given model.
+	 *
+	 * @param {string} model - The name of the model.
+	 * @returns {Object} The ORM object for the specified model.
+	 * @throws {Error} If the model is not found in PrismaOrmObject.
+	 */
+	static getORMObject(model) {
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
+
+		const ormObject = PrismaOrmObject[model];
+		if(!ormObject) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
+		return ormObject;
+	}
+
+	/**
+	 * Resolves the ID for a given model based on its type.
+	 *
+	 * @param {number|string} id - The ID of the record.
+	 * @param {string} model - The name of the model.
+	 * @returns {number|string} The resolved ID.
+	 * @throws {Error} If the model is not found or the ID type is invalid.
+	 */
+	static resolveId(id, model) {
+		if(!id) {
+			throw new Error('ID is required to resolve.');
+		}
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
+
+		const orm = PrimateService.getORMObject(model);
+		if(!orm) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
+		if(orm.id === 'Int') {
+			const parsedId = parseInt(id, 10);
+			if(isNaN(parsedId)) {
+				throw new Error(`ID "${ id }" is not a valid integer.`);
+			}
+			return parsedId;
+		} else {
+			return id;
+		}
+	}
+
+	/**
+	 * Finds a unique record in the database based on the provided criteria.
+	 *
+	 * @param {Object} where - The criteria to find the record.
+	 * @param {string} model - The name of the model.
+	 * @param {Object} [params={}] - Optional parameters.
+	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
+	 * @throws {Error} If any error occurs during the query.
+	 */
+	static async findBy(where, model, params = {}) {
+		if(!where || typeof where !== 'object') throw new Error('The "where" parameter must be a non-empty object.');
+		if(!model || typeof model !== 'string') throw new Error('The "model" parameter must be a non-empty string.');
+
+		try {
+			return await prisma[model].findFirst({
+				where,
+				...params,
+			});
+		} catch(e) {
+			console.error(`Error finding ${ model } with criteria ${ JSON.stringify(where) }:`, e);
+			throw new Error(`Error finding ${ model }: ${ e.message }`);
+		}
+	}
+
+	/**
+	 * Finds a record by its ID or UID in the specified model.
+	 *
+	 * @param {number|string} id - The ID of the record.
+	 * @param {string} model - The name of the model.
+	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
+	 * @throws {Error} If the model is not found or an error occurs during the query.
+	 */
+	static async findById(id, model) {
+		if(!id) {
+			throw new Error('ID is required to find a record.');
+		}
+		if(!model || typeof model !== 'string') {
+			throw new Error('The "model" parameter must be a non-empty string.');
+		}
+
+		const ormObject = PrimateService.getORMObject(model);
+		if(!ormObject) {
+			throw new Error(`Model "${ model }" not found in PrismaOrmObject.`);
+		}
+
+		try {
+			return await prisma[model].findUnique({
+				where: PrimateService.resolveWhere(id, model),
+			});
+		} catch(e) {
+			console.error(`Error finding ${ model } with ID ${ id }:`, e);
+			throw new Error(`Error finding ${ model }: ${ e.message }`);
+		}
 	}
 }
 

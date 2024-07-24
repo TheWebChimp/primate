@@ -1,34 +1,56 @@
 import jwt from '../jwt.js';
-import createError from 'http-errors';
+
+/**
+ * Authentication middleware to verify JWT tokens.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @throws {Error} If any error occurs during token verification.
+ */
 
 const auth = async (req, res, next) => {
-	if(!req.headers.authorization) {
+	try {
+		// Validate the Authorization header
+		const authHeader = req.headers.authorization;
+		if(!authHeader) {
+			return res.respond({
+				status: 401,
+				message: 'Unauthorized: No authorization header present.',
+			});
+		}
 
-		return res.respond({
-			status: 401,
-			message: 'Unauthorized: No header present.',
-		});
-	}
-	const token = req.headers.authorization.split(' ')[1];
-	if(!token) {
+		// Extract the token from the Authorization header
+		const token = authHeader.split(' ')[1];
+		if(!token) {
+			return res.respond({
+				status: 401,
+				message: 'Unauthorized: Please provide a valid token.',
+			});
+		}
 
-		return res.respond({
-			status: 401,
-			message: 'Unauthorized: Please provide a valid token.',
-		});
-	}
-	await jwt.verifyAccessToken(token).then(user => {
-		req.user = user;
+		// Verify the JWT token
+		req.user = await jwt.verifyAccessToken(token);
 		next();
-	}).catch(e => {
 
-		res.respond({
-			status: 401,
-			message: 'Unauthorized: Invalid token: ' + e.message,
-		});
-
-		//next(createError.Unauthorized(e.message));
-	});
+	} catch(e) {
+		if(e.name === 'TokenExpiredError') {
+			res.respond({
+				status: 401,
+				message: 'Unauthorized: Token has expired: ' + e.message,
+			});
+		} else if(e.name === 'JsonWebTokenError') {
+			res.respond({
+				status: 401,
+				message: 'Unauthorized: Invalid token: ' + e.message,
+			});
+		} else {
+			res.respond({
+				status: 401,
+				message: 'Unathorized: ' + e.message,
+			});
+		}
+	}
 };
 
 export default auth;
