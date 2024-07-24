@@ -5,7 +5,7 @@ branding:
   title: Primate
   label: Documentation
 links:
-- text: Getting Started
-  link: https://retype.com/guides/getting-started/
+- text: Repo
+  link: https://github.com/TheWebChimp/primate/
 footer:
   copyright: "&copy; Copyright {{ year }}. All rights reserved."
