@@ -29,6 +29,17 @@ app.use((req, res, next) => {
 //app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 //app.use(express.json());
 
+app.use((req, res, next) => {
+	if(req.method === 'OPTIONS') {
+		res.header('Access-Control-Allow-Origin', '*');
+		res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+		res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Encoding, Accept-Encoding');
+		// If you need to handle pre-flight OPTIONS request, you can respond with status 200
+		return res.status(200).end();
+	}
+	next();
+});
+
 // Enabling CORS for all requests
 app.use(cors());
 
