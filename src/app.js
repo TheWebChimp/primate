@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
 	if(req.method === 'OPTIONS') {
 		res.header('Access-Control-Allow-Origin', '*');
-		res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+		res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS,DELETE,PATCH');
 		res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Encoding, Accept-Encoding');
 		// If you need to handle pre-flight OPTIONS request, you can respond with status 200
 		return res.status(200).end();
