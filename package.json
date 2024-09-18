@@ -18,7 +18,7 @@
 	"license": "ISC",
 	"dependencies": {
 		"@prisma/client": "^5.7.1",
-		"@thewebchimp/primate": "^1.3.2-entities",
+		"prisma": "^5.7.1",
 		"body-parser": "^1.20.2",
 		"chalk": "^5.3.0",
 		"change-case": "^5.4.4",
@@ -32,7 +32,6 @@
 		"jsonwebtoken": "^9.0.2",
 		"morgan": "^1.10.0",
 		"pluralize": "^8.0.0",
-		"prisma": "^5.7.1",
 		"slugify": "^1.6.6"
 	}
 }

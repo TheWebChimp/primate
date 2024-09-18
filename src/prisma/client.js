@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import chalk from 'chalk';
+import primate from '../primate.js';
 
 let prisma;
 
@@ -11,7 +12,8 @@ let prisma;
 try {
 	prisma = new PrismaClient();
 } catch(e) {
-	console.log(chalk.white.bgRed('⚠️💎 Prisma does not exist. Please initialize it first if you want to use it.'));
+	console.error(e);
+	console.error(chalk.white.bgRed('⚠️💎 Prisma does not exist. Please initialize it first if you want to use it.'));
 	prisma = null;
 }
 

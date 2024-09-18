@@ -4,6 +4,7 @@ import fs from 'fs';
 import chalk from 'chalk';
 import primate from '../primate.js';
 import pluralize from 'pluralize';
+import * as changeCase from 'change-case';
 
 /**
  * Generic controller for handling CRUD operations.
@@ -52,7 +53,7 @@ export default class PrimateController {
 		this.modelName = modelName;
 
 		// Entity is the model name with the first letter in lowercase
-		this.entity = modelName.charAt(0).toLowerCase() + modelName.slice(1);
+		this.entity = changeCase.camelCase(modelName);
 
 		this.options = options;
 	}
@@ -66,9 +67,11 @@ export default class PrimateController {
 	 */
 	async all(req, res, next) {
 
+		const requestOptions = { ...this.options };
+
 		// Hook all globally
 		if(primate.hooks?.all) {
-			primate.hooks.all(req, res, next, this.options);
+			primate.hooks.all(req, res, next, requestOptions);
 		}
 
 		// Convert query parameters that look like numbers to integers
@@ -83,12 +86,12 @@ export default class PrimateController {
 		}
 
 		// add the current user id to the data
-		if(req.user) this.options.user = req.user.payload;
+		if(req.user) requestOptions.user = req.user.payload;
 
 		try {
 			if(typeof this.service?.all === 'function') {
 
-				const { count, data } = await this.service.all(req.query, this.options);
+				const { count, data } = await this.service.all(req.query, requestOptions);
 
 				if(data.length === 0) {
 					return res.respond({
@@ -103,9 +106,8 @@ export default class PrimateController {
 					props: { count },
 				});
 			} else {
-				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
-
-				const { count, data } = await PrimateService.all(this.entity, req.query, this.options);
+				console.warn(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
+				const { count, data } = await this.invokeServiceMethod('all', this.entity, req.query, requestOptions);
 
 				if(data.length === 0) {
 					return res.respond({
@@ -122,7 +124,10 @@ export default class PrimateController {
 			}
 
 		} catch(e) {
-			next(createError(401, e.message));
+			console.error(`Error fetching all ${ this.modelName }:`, e);
+			const statusCode = e.status || 500;
+			const message = e.message || 'Internal Server Error';
+			next(createError(statusCode, message));
 		}
 	}
 
@@ -144,11 +149,10 @@ export default class PrimateController {
 			// remove id from body
 			delete req.body.id;
 
-			const service = this.service?.create && typeof this.service?.create === 'function' ? this.service : PrimateService;
-			const record = await service.create(req.body, this.entity, options);
+			const record = await this.invokeServiceMethod('create', this.entity, req.body, options);
 
 			if(typeof this.service?.create !== 'function') {
-				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
+				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
 			}
 
 			res.respond({
@@ -157,7 +161,7 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
-			console.log('Error creating ' + this.modelName + ': ' + e.message, e);
+			console.error('Error creating ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error creating ' + this.modelName + ': ' + e.message;
 
 			if(e.code === 'P2002') {
@@ -184,11 +188,16 @@ export default class PrimateController {
 	 */
 	async get(req, res) {
 		try {
-			const service = this.service?.get && typeof this.service?.get === 'function' ? this.service : PrimateService;
-			const record = await service.get(req.params.id, this.entity, req.query, this.options);
+			const record = await this.invokeServiceMethod('get', this.entity, req.params.id, req.query, this.options);
+			if(!record) {
+				return res.respond({
+					status: 404,
+					message: `${ this.modelName } not found`,
+				});
+			}
 
 			if(typeof this.service?.get !== 'function') {
-				console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
+				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
 			}
 
 			if(!record) {
@@ -203,7 +212,7 @@ export default class PrimateController {
 				message: this.modelName + ' retrieved successfully',
 			});
 		} catch(e) {
-			console.log('Error retrieving ' + this.modelName + ': ' + e.message, e);
+			console.error('Error retrieving ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error retrieving ' + this.modelName + ': ' + e.message;
 
 			return res.respond({
@@ -229,9 +238,10 @@ export default class PrimateController {
 			const { id } = req.params;
 			const data = { ...req.body };
 			const { user } = req;
-			const { options, entity, service, modelName } = this;
+			const { options, entity, modelName } = this;
 
 			if(!id) {
+				console.error('ID is required to update an item.');
 				throw new Error('ID is required to update an item.');
 			}
 
@@ -243,13 +253,7 @@ export default class PrimateController {
 			// Remove id from the body to prevent updating the ID
 			delete data.id;
 
-			// Fetch the existing record
-			let oldRecord;
-			if(typeof service?.get === 'function') {
-				oldRecord = await service.get(id, options);
-			} else {
-				oldRecord = await PrimateService.get(id, entity, req.query, options);
-			}
+			const oldRecord = await this.invokeServiceMethod('get', entity, id, req.query, options);
 
 			if(!oldRecord) {
 				return res.respond({
@@ -257,14 +261,7 @@ export default class PrimateController {
 					message: `${ modelName } not found`,
 				});
 			}
-
-			// Update the record
-			let updatedRecord;
-			if(typeof service?.update === 'function') {
-				updatedRecord = await service.update(id, data, options);
-			} else {
-				updatedRecord = await PrimateService.update(id, data, entity, options);
-			}
+			const updatedRecord = await this.invokeServiceMethod('update', entity, id, data, options);
 
 			res.respond({
 				data: updatedRecord,
@@ -309,13 +306,15 @@ export default class PrimateController {
 				});
 			}
 
-			let record;
+			/*let record;
 
 			if(typeof this.service?.delete === 'function') {
 				record = await this.service.delete(id, this.options);
 			} else {
 				record = await PrimateService.delete(id, this.entity);
-			}
+			}*/
+
+			const record = await this.invokeServiceMethod('delete', this.entity, id, this.options);
 
 			if(!record) {
 				return res.respond({
@@ -403,7 +402,7 @@ export default class PrimateController {
 				});
 			}
 
-			const record = await PrimateService.updateMetas(id, data, this.entity);
+			const record = await this.invokeServiceMethod('updateMetas', this.entity, id, data);
 
 			if(!record) {
 				return res.respond({
@@ -422,6 +421,28 @@ export default class PrimateController {
 				status: 500,
 				message: 'Error updating metas for ' + this.modelName + ': ' + e.message,
 			});
+		}
+	}
+
+	/**
+	 * Invokes a service method with fallback to PrimateService.
+	 *
+	 * @param {string} method - The method name to invoke.
+	 * @param {Array} args - Arguments to pass to the method.
+	 * @returns {Promise<any>} - The result from the service method.
+	 */
+	async invokeServiceMethod(method, ...args) {
+		if(typeof this.service[method] === 'function') {
+
+			// Remove the first argument
+			args.shift();
+
+			return await this.service[method](...args);
+		} else if(typeof PrimateService[method] === 'function') {
+			console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), `${ this.modelName }Service.${ method } not found, using PrimateService`);
+			return await PrimateService[method](...args);
+		} else {
+			throw createError(500, `Method ${ method } not found in service or PrimateService.`);
 		}
 	}
 }

@@ -101,14 +101,13 @@ const addOneToManyRelations = (obj, models, model) => {
 	});
 };
 
-
-
 let PrismaOrmObject = null;
 
 try {
 	PrismaOrmObject = generatePrismaOrmObject();
 } catch(e) {
-	console.log(chalk.white.bgRed('⚠️💎 Prisma does not exist. Please initialize it first if you want to use it.'));
+	console.error(e);
+	console.error(chalk.white.bgRed('⚠️💎 ' + e.message));
 }
 
 export { PrismaOrmObject };

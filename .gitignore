@@ -99,3 +99,5 @@ embeddings/
 public/
 
 .idea/
+.playground/
+.generated/
