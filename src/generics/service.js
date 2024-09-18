@@ -672,6 +672,8 @@ class PrimateService {
 			throw new Error('The "model" parameter must be a non-empty string.');
 		}
 
+		console.log(PrimateService.orm);
+
 		const ormObject = PrimateService.orm[model];
 		if(!ormObject) {
 			throw new Error(`Model "${ model }" not found in PrimateService.orm.`);

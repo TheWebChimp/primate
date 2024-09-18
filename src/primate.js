@@ -89,8 +89,6 @@ class Primate {
 				console.log(chalk.green('⚠️💎 Prisma client imported successfully'));
 				this.prisma = new prismaClient.PrismaClient();
 
-				PrimateService.initialize(this.prisma);
-
 			} catch(error) {
 				console.error(chalk.red('Error importing Prisma client:'), error);
 				throw new Error(`Error importing Prisma client: ${ error.message }`);
@@ -101,6 +99,8 @@ class Primate {
 				let PrismaOrmObject = null;
 				PrismaOrmObject = Primate.generatePrismaOrmObject(prismaClient.Prisma);
 				this.orm = PrismaOrmObject;
+
+				PrimateService.initialize(this.prisma, this.orm);
 
 			} catch(error) {
 				console.error(chalk.red('Error initializing Prisma service:'), error);
