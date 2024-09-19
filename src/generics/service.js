@@ -82,7 +82,7 @@ class PrimateService {
 			}
 
 			// Sanitize data to avoid errors
-			data = this.sanitizeData(data, model);
+			data = this.sanitizeData(model, data);
 
 			// Handle upsert rules if set
 			if(options.upsertRules) {
@@ -206,7 +206,7 @@ class PrimateService {
 			}
 
 			// Sanitize data to avoid errors removing the fields that are not in the model
-			data = this.sanitizeData(data, model);
+			data = this.sanitizeData(model, data);
 
 			let where;
 			// if option.searchFields exists && id is not a number
@@ -218,7 +218,7 @@ class PrimateService {
 					};
 				}
 			} else {
-				where = { id: PrimateService.resolveId(id, model) };
+				where = { id: PrimateService.resolveId(model, id) };
 			}
 
 			return await PrimateService.prisma[model].update({ where, data });
@@ -508,12 +508,12 @@ class PrimateService {
 	/**
 	 * Sanitizes the data by removing fields that are not in the model.
 	 *
-	 * @param {Object} data - The data to be sanitized.
 	 * @param {string} model - The name of the model.
+	 * @param {Object} data - The data to be sanitized.
 	 * @returns {Object} The sanitized data.
 	 * @throws {Error} If the model is not found or the parameters are invalid.
 	 */
-	static sanitizeData(data, model) {
+	static sanitizeData(model, data) {
 		// Validate parameters
 		if(!data || typeof data !== 'object') {
 			throw new Error('The "data" parameter must be a non-empty object.');
@@ -542,19 +542,19 @@ class PrimateService {
 	/**
 	 * Prepares CRUD and additional routes for a given model.
 	 *
+	 * @param {string|Object} modelOrController - The model name or an instance of a model controller.
 	 * @param {Express.Router} router - The Express router.
-	 * @param {string|Object} model - The model name or an instance of a model controller.
 	 * @param options - Optional parameters.
 	 */
-	static prepareCrUDAGRoutes(router, model, options = {}) {
+	static prepareCrUDAGRoutes(modelOrController, router, options = {}) {
 		if(!router || typeof router !== 'function' || typeof router.get !== 'function') {
 			throw new Error('A valid Express router is required.');
 		}
-		if(!model) {
+		if(!modelOrController) {
 			throw new Error('Model is required to prepare routes.');
 		}
 
-		const controller = typeof model === 'string' ? new Controller(model) : model;
+		const controller = typeof modelOrController === 'string' ? new Controller(modelOrController) : modelOrController;
 
 		const bypassMiddleware = (req, res, next) => next();
 		const createAuth = options.disableAuth || options.disableCreateAuth ? bypassMiddleware : auth;
@@ -654,7 +654,7 @@ class PrimateService {
 				throw new Error(`Model "${ model }" does not have a "uid" field.`);
 			}
 		} else {
-			where = { id: PrimateService.resolveId(id, model) };
+			where = { id: PrimateService.resolveId(model, id) };
 		}
 
 		return where;
@@ -685,12 +685,12 @@ class PrimateService {
 	/**
 	 * Resolves the ID for a given model based on its type.
 	 *
-	 * @param {number|string} id - The ID of the record.
 	 * @param {string} model - The name of the model.
+	 * @param {number|string} id - The ID of the record.
 	 * @returns {number|string} The resolved ID.
 	 * @throws {Error} If the model is not found or the ID type is invalid.
 	 */
-	static resolveId(id, model) {
+	static resolveId(model, id) {
 		if(!id) {
 			throw new Error('ID is required to resolve.');
 		}
@@ -717,13 +717,13 @@ class PrimateService {
 	/**
 	 * Finds a unique record in the database based on the provided criteria.
 	 *
-	 * @param {Object} where - The criteria to find the record.
 	 * @param {string} model - The name of the model.
+	 * @param {Object} where - The criteria to find the record.
 	 * @param {Object} [params={}] - Optional parameters.
 	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
 	 * @throws {Error} If any error occurs during the query.
 	 */
-	static async findBy(where, model, params = {}) {
+	static async findBy(model, where, params = {}) {
 		if(!where || typeof where !== 'object') throw new Error('The "where" parameter must be a non-empty object.');
 		if(!model || typeof model !== 'string') throw new Error('The "model" parameter must be a non-empty string.');
 
@@ -741,12 +741,12 @@ class PrimateService {
 	/**
 	 * Finds a record by its ID or UID in the specified model.
 	 *
-	 * @param {number|string} id - The ID of the record.
 	 * @param {string} model - The name of the model.
+	 * @param {number|string} id - The ID of the record.
 	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
 	 * @throws {Error} If the model is not found or an error occurs during the query.
 	 */
-	static async findById(id, model) {
+	static async findById(model, id) {
 		if(!id) {
 			throw new Error('ID is required to find a record.');
 		}

@@ -22,7 +22,7 @@ const setupRoute = (model, router, options = {}) => {
 
 	// Use custom router if provided, otherwise use the given router
 	const routeHandler = options.router || router;
-	PrimateService.prepareCrUDAGRoutes(routeHandler, controller, options);
+	PrimateService.prepareCrUDAGRoutes(controller, routeHandler, options);
 };
 
 export { getRouter, auth, setupRoute };
