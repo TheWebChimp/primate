@@ -13,9 +13,32 @@ class PrimateService {
 	static prisma = null;
 	static orm = null;
 
+	static hooks = {
+		beforeCreate: [],
+		afterCreate: [],
+		beforeUpdate: [],
+		afterUpdate: [],
+		beforeDelete: [],
+		afterDelete: [],
+	};
+
 	static initialize(prismaInstance, orm) {
 		PrimateService.prisma = prismaInstance;
 		PrimateService.orm = orm;
+	}
+
+	// Hooks
+	static addHook(event, fn) {
+		if(!this.hooks[event]) throw new Error(`Invalid hook: ${ event }`);
+		this.hooks[event].push(fn);
+	}
+
+	static async runHooks(event, context) {
+		if(this.hooks[event]) {
+			for(const hook of this.hooks[event]) {
+				await hook(context);
+			}
+		}
 	}
 
 	// The functions are in the following order: CrUDAG
@@ -36,6 +59,9 @@ class PrimateService {
 	static async create(model, data, options = {}) {
 
 		if(!model) throw new Error('Model is required to create an item.');
+
+		const context = { model, data, options };
+		await this.runHooks('beforeCreate', context);
 
 		try {
 			data = await Primate.validateSchema(model, data);
@@ -95,7 +121,11 @@ class PrimateService {
 				}
 			}
 
-			return await PrimateService.prisma[model].create({ data });
+			const record = await PrimateService.prisma[model].create({ data });
+
+			await this.runHooks('afterCreate', { ...context, record });
+
+			return record;
 
 		} catch(e) {
 			console.error('Error creating record:', e);
@@ -120,6 +150,9 @@ class PrimateService {
 
 		if(!model) throw new Error('Model is required to update an item.');
 		if(!id) throw new Error('ID is required to update an item.');
+
+		const context = { model, id, data, options };
+		await this.runHooks('beforeUpdate', context);
 
 		// convert first letter of model to lowercase
 		model = model[0].toLowerCase() + model.slice(1);
@@ -221,7 +254,12 @@ class PrimateService {
 				where = { id: PrimateService.resolveId(model, id) };
 			}
 
-			return await PrimateService.prisma[model].update({ where, data });
+			const record = await PrimateService.prisma[model].update({ where, data });
+
+			await this.runHooks('afterUpdate', { ...context, record });
+
+			return record;
+
 		} catch(e) {
 			throw e;
 		}
@@ -241,6 +279,9 @@ class PrimateService {
 		if(!model || typeof model !== 'string') throw new Error('Model is required to delete an item.');
 		if(!id) throw new Error('ID is required to delete an item.');
 
+		const context = { model, id };
+		await this.runHooks('beforeDelete', context);
+
 		// Convert the first letter of the model to lowercase
 		model = model[0].toLowerCase() + model.slice(1);
 
@@ -250,7 +291,10 @@ class PrimateService {
 		}
 
 		try {
-			return await PrimateService.prisma[model].delete({ where: PrimateService.resolveWhere(model, id) });
+			const record = PrimateService.prisma[model].delete({ where: PrimateService.resolveWhere(model, id) });
+			await this.runHooks('afterDelete', { ...context, record });
+			return record;
+
 		} catch(e) {
 			console.error(`Error deleting ${ model } with ID ${ id }:`, e);
 			throw new Error(`Error deleting ${ model }: ${ e.message }`);
@@ -269,9 +313,10 @@ class PrimateService {
 	 */
 	static async all(model, query, options = {}) {
 
-		if(!model || typeof model !== 'string') {
-			throw new Error('Model is required to get items.');
-		}
+		if(!model || typeof model !== 'string') throw new Error('Model is required to get items.');
+
+		const context = { model, query, options };
+		await this.runHooks('beforeAll', context);
 
 		// Default values for pagination and sorting
 		let { page = 1, limit = 100, by = 'id', order = 'desc', q, count: countQuery, select } = query;
@@ -415,6 +460,9 @@ class PrimateService {
 			if(options.filterResultData) {
 				data = await options.filterResultData(data, query);
 			}
+
+			await this.runHooks('afterAll', { ...context, data });
+
 			return { data, count: totalCount };
 		} catch(e) {
 			console.error(`Error retrieving ${ model }:`, e);
@@ -440,6 +488,9 @@ class PrimateService {
 
 		if(!id) throw new Error('ID is required to get an item.');
 		if(!model || typeof model !== 'string') throw new Error('Model is required to get an item.');
+
+		const context = { model, id, query, options };
+		await this.runHooks('beforeGet', context);
 
 		// Convert the first letter of the model to lowercase
 		model = model[0].toLowerCase() + model.slice(1);
@@ -497,6 +548,9 @@ class PrimateService {
 			if(options.filterGetItem) {
 				get = await options.filterGetItem(get, query);
 			}
+
+			await this.runHooks('afterGet', { ...context, get });
+
 			return get;
 		} catch(e) {
 			console.error(`Error retrieving ${ model } with ID ${ id }:`, e);

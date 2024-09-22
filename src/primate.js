@@ -12,6 +12,11 @@ import PrimateService from './generics/service.js';
  * Class representing the Primate application.
  */
 class Primate {
+
+	static prisma = null;
+	static app = null;
+	static orm = null;
+
 	/**
 	 * Create a new Primate application.
 	 * @constructor
@@ -72,12 +77,11 @@ class Primate {
 
 		const entitiesDir = config.entitiesDir || './entities';
 		const prismaClientLocation = config.prismaClientLocation || '@prisma/client';
-		const usePrisma = config.usePrisma || true;
+		const usePrisma = typeof config.usePrisma === 'boolean' ? config.usePrisma : true;
 
 		// Check that the entities directory exists
 		if(!fs.existsSync(entitiesDir)) {
 			console.log(chalk.red('Entities directory not found:'), entitiesDir);
-			throw new Error(`Entities directory not found: ${ entitiesDir }`);
 		}
 
 		// import the Prisma client based on the location provided
@@ -88,6 +92,7 @@ class Primate {
 				prismaClient = await import(prismaClientLocation);
 				console.log(chalk.green('⚠️💎 Prisma client imported successfully'));
 				this.prisma = new prismaClient.PrismaClient();
+				Primate.prisma = this.prisma;
 
 			} catch(error) {
 				console.error(chalk.red('Error importing Prisma client:'), error);
@@ -99,6 +104,7 @@ class Primate {
 				let PrismaOrmObject = null;
 				PrismaOrmObject = Primate.generatePrismaOrmObject(prismaClient.Prisma);
 				this.orm = PrismaOrmObject;
+				Primate.orm = this.orm;
 
 				PrimateService.initialize(this.prisma, this.orm);
 
