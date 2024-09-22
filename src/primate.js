@@ -1,3 +1,4 @@
+import express from 'express';
 import chalk from 'chalk';
 import getPort from 'get-port';
 import createError from 'http-errors';
@@ -7,6 +8,7 @@ import pluralize from 'pluralize';
 
 import app from './app.js';
 import PrimateService from './generics/service.js';
+import PrimateController from './generics/controller.js';
 
 /**
  * Class representing the Primate application.
@@ -418,6 +420,29 @@ class Primate {
 				}
 			}
 		});
+	};
+
+	/**
+	 * Creates a new Express router.
+	 * @returns {object} A new Express router instance.
+	 */
+	static getRouter() {
+		return express.Router();
+	}
+
+	/**
+	 * Sets up routes for a given model using a provided or default router.
+	 *
+	 * @param {string} model - The name of the model.
+	 * @param {express.Router} router - The Express router to set up routes on.
+	 * @param {Object} [options={}] - Optional parameters.
+	 */
+	static setupRoute(model, router, options = {}) {
+		const controller = new PrimateController(model, options);
+
+		// Use custom router if provided, otherwise use the given router
+		const routeHandler = options.router || router;
+		PrimateService.prepareCrUDAGRoutes(controller, routeHandler, options);
 	};
 
 	/**
