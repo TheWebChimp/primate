@@ -308,7 +308,7 @@ class PrimateService {
 	 * @param {string} model - The name of the model.
 	 * @param {Object} query - The query parameters.
 	 * @param {Object} [options={}] - Optional parameters.
-	 * @returns {Promise<Object>} The retrieved records and their count.
+	 * @returns {Promise<[Object|[]]>} The retrieved records and their count.
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
 	static async all(model, query, options = {}) {
