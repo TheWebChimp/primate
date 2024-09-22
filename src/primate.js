@@ -206,7 +206,7 @@ class Primate {
 					// Add the router to the entities object
 					entities[entityName] = router;
 				} catch(err) {
-					console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Error found inside entity "${ file }":`, err.name, err.message);
+					console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Error found inside entity "${ file }":`, err);
 				}
 			}
 		} catch(error) {
