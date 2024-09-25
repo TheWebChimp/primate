@@ -311,7 +311,7 @@ class PrimateService {
 	 * @returns {Promise<[Object|[]]>} The retrieved records and their count.
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
-	static async all(model, query, options = {}) {
+	static async all(model, query = {}, options = {}) {
 
 		if(!model || typeof model !== 'string') throw new Error('Model is required to get items.');
 
