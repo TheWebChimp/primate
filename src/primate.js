@@ -434,7 +434,7 @@ class Primate {
 	 * Sets up routes for a given model using a provided or default router.
 	 *
 	 * @param {string} model - The name of the model.
-	 * @param {express.Router} router - The Express router to set up routes on.
+	 * @param {Router} router - The Express router to set up routes on.
 	 * @param {Object} [options={}] - Optional parameters.
 	 */
 	static setupRoute(model, router, options = {}) {
