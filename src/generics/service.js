@@ -48,12 +48,13 @@ class PrimateService {
 	/**
 	 * Creates a new record in the database.
 	 *
+	 * @template T
 	 * @param {string} model - The name of the model.
 	 * @param {Object} data - The data to be created.
 	 * @param {Object} [options={}] - Optional parameters.
 	 * @param {Function} [options.filterCreateData] - Function to filter create data.
 	 * @param {Object} [options.upsertRules] - Rules for upsert operations.
-	 * @returns {Promise<Object>} The created record.
+	 * @returns {Promise<T>} The created record.
 	 * @throws {Error} If any error occurs during creation.
 	 */
 	static async create(model, data, options = {}) {
@@ -137,13 +138,14 @@ class PrimateService {
 	/**
 	 * Updates a record in the database.
 	 *
+	 * @template T
 	 * @param {string} model - The name of the model.
 	 * @param {number|string} id - The ID of the record to update.
 	 * @param {Object} data - The data to update.
 	 * @param {Object} [options={}] - Optional parameters.
 	 * @param {Function} [options.filterUpdateData] - Function to filter update data.
 	 * @param {string} [options.searchField] - Field to search for the record if ID is not a number.
-	 * @returns {Promise<Object>} The updated record.
+	 * @returns {Promise<T>} The updated record.
 	 * @throws {Error} If any error occurs during the update.
 	 */
 	static async update(model, id, data, options = {}) {
@@ -269,9 +271,10 @@ class PrimateService {
 	/**
 	 * Deletes a record by its ID from the specified model.
 	 *
+	 * @template T
 	 * @param {number|string} id - The ID of the record to delete.
 	 * @param {string} model - The name of the model.
-	 * @returns {Promise<Object>} The deleted record.
+	 * @returns {Promise<T>} The deleted record.
 	 * @throws {Error} If any required parameter is missing or an error occurs during deletion.
 	 */
 	static async delete(model, id) {
@@ -305,10 +308,11 @@ class PrimateService {
 	/**
 	 * Retrieves a list of records from the specified model based on query parameters.
 	 *
+	 * @template T
 	 * @param {string} model - The name of the model.
 	 * @param {Object} query - The query parameters.
 	 * @param {Object} [options={}] - Optional parameters.
-	 * @returns {Promise<[Object|[]]>} The retrieved records and their count.
+	 * @returns {Promise<{[T], number}>} The list of records and the total count.
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
 	static async all(model, query = {}, options = {}) {
@@ -418,7 +422,7 @@ class PrimateService {
 				if(PrimateService.orm[model].hasOwnProperty(field)) {
 					args.select[field] = true;
 				} else {
-					console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
+					console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
 				}
 			});
 		}
@@ -474,14 +478,15 @@ class PrimateService {
 	/**
 	 * Retrieves a record from the database based on the given ID and model.
 	 *
-	 * @param {number|string} id - The ID of the record to retrieve.
+	 * @template T
 	 * @param {string} model - The name of the model.
+	 * @param {number|string} id - The ID of the record to retrieve.
 	 * @param {Object} [query={}] - The query parameters.
 	 * @param {Object} [options={}] - Optional parameters.
 	 * @param {Function} [options.resolveWhere] - Function to resolve the where clause.
 	 * @param {string[]} [options.searchField] - Fields to search if ID is not a number.
 	 * @param {Function} [options.filterGetItem] - Function to filter the retrieved item.
-	 * @returns {Promise<Object|null>} The retrieved record, or null if no record is found.
+	 * @returns {Promise<T>} The retrieved record.
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
 	static async get(model, id, query = {}, options = {}) {
@@ -582,11 +587,11 @@ class PrimateService {
 		}
 
 		// Sanitize data by removing fields that are not in the model
-		for(const [ field, value ] of Object.entries(data)) {
+		for(const [ field ] of Object.entries(data)) {
 			if(!modelObject.hasOwnProperty(field)) {
 				delete data[field];
 				// Log a warning
-				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
+				console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The field "${ field }" is not in the model "${ model }".`);
 			}
 		}
 
@@ -726,8 +731,6 @@ class PrimateService {
 			throw new Error('The "model" parameter must be a non-empty string.');
 		}
 
-		console.log(PrimateService.orm);
-
 		const ormObject = PrimateService.orm[model];
 		if(!ormObject) {
 			throw new Error(`Model "${ model }" not found in PrimateService.orm.`);
@@ -771,10 +774,11 @@ class PrimateService {
 	/**
 	 * Finds a unique record in the database based on the provided criteria.
 	 *
+	 * @template T
 	 * @param {string} model - The name of the model.
 	 * @param {Object} where - The criteria to find the record.
 	 * @param {Object} [params={}] - Optional parameters.
-	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
+	 * @returns {Promise<T|null>} The found record, or null if no record is found.
 	 * @throws {Error} If any error occurs during the query.
 	 */
 	static async findBy(model, where, params = {}) {
@@ -795,9 +799,10 @@ class PrimateService {
 	/**
 	 * Finds a record by its ID or UID in the specified model.
 	 *
+	 * @template T
 	 * @param {string} model - The name of the model.
 	 * @param {number|string} id - The ID of the record.
-	 * @returns {Promise<Object|null>} The found record, or null if no record is found.
+	 * @returns {Promise<T|null>} The found record, or null if no record is found.
 	 * @throws {Error} If the model is not found or an error occurs during the query.
 	 */
 	static async findById(model, id) {

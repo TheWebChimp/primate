@@ -18,6 +18,8 @@ class Primate {
 	static prisma = null;
 	static app = null;
 	static orm = null;
+	static hooks = {};
+	static settings = {};
 
 	/**
 	 * Create a new Primate application.
@@ -28,6 +30,7 @@ class Primate {
 		this.hooks = {};
 		this.prisma = null;
 		this.orm = null;
+		this.settings = {};
 	}
 
 	/**
@@ -48,8 +51,8 @@ class Primate {
 		port = await getPort({ port: ports });
 
 		this.app.listen(port, () => {
-			console.log(chalk.white.bgRgb(204, 0, 0).bold(` 🐵 🙈 🙉 🙊 PRIMATE STARTED 🙊 🙉 🙈 🐵 `));
-			console.log(chalk.yellowBright.bgBlack.bold(`Listening on port ${ port }! `));
+			console.info(chalk.white.bgRgb(204, 0, 0).bold(` 🐵 🙈 🙉 🙊 PRIMATE STARTED 🙊 🙉 🙈 🐵 `));
+			console.info(chalk.yellowBright.bgBlack.bold(`Listening on port ${ port }! `));
 		});
 	}
 
@@ -80,10 +83,12 @@ class Primate {
 		const entitiesDir = config.entitiesDir || './entities';
 		const prismaClientLocation = config.prismaClientLocation || '@prisma/client';
 		const usePrisma = typeof config.usePrisma === 'boolean' ? config.usePrisma : true;
+		this.settings = config.settings || {};
+		Primate.settings = this.settings;
 
 		// Check that the entities directory exists
 		if(!fs.existsSync(entitiesDir)) {
-			console.log(chalk.red('Entities directory not found:'), entitiesDir);
+			console.warn(chalk.red('Entities directory not found:'), entitiesDir);
 		}
 
 		// import the Prisma client based on the location provided
@@ -92,7 +97,7 @@ class Primate {
 			let prismaClient;
 			try {
 				prismaClient = await import(prismaClientLocation);
-				console.log(chalk.green('⚠️💎 Prisma client imported successfully'));
+				console.info(chalk.green('⚠️💎 Prisma client imported successfully'));
 				this.prisma = new prismaClient.PrismaClient();
 				Primate.prisma = this.prisma;
 
@@ -205,8 +210,15 @@ class Primate {
 
 					// Add the router to the entities object
 					entities[entityName] = router;
-				} catch(err) {
-					console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Error found inside entity "${ file }":`, err);
+				} catch(e) {
+					// if error contains 'Error: File not found', ignore it
+					if(e.message.includes('File not found')) {
+						if(!this.settings.suppressEntitiesNotFound) {
+							console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), e.message);
+						}
+					} else {
+						console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Error found inside entity "${ file }":`, e);
+					}
 				}
 			}
 		} catch(error) {
@@ -333,7 +345,7 @@ class Primate {
 
 		// if the file does not exist, return true
 		if(!fs.existsSync(schemaPath)) {
-			console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file not found for entity "${ entity }"`);
+			console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file not found for entity "${ entity }"`);
 			return data;
 		}
 
@@ -342,7 +354,7 @@ class Primate {
 
 		// check that schema is a Joi object
 		if(typeof schema.default !== 'object') {
-			console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file for entity "${ entity }" does not export a Joi object`);
+			console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `Schema file for entity "${ entity }" does not export a Joi object`);
 			return data;
 		}
 

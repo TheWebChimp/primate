@@ -48,7 +48,7 @@ export default {
 			// Verify the JWT access token
 			jwt.verify(token, accessTokenSecret, (err, payload) => {
 				if(err) {
-					console.log('Error verifying access token:', err);
+					console.error('Error verifying access token:', err);
 					const message = err.message;
 					return reject(createError.Unauthorized(message));
 				}

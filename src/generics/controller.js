@@ -43,7 +43,7 @@ export default class PrimateController {
 
 			} catch(e) {
 				// Chalk warning
-				console.log(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ this.singular }" was not found in the services directory: ${ e }`);
+				console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ this.singular }" was not found in the services directory: ${ e }`);
 			}
 		} else {
 
@@ -432,14 +432,14 @@ export default class PrimateController {
 	 * @returns {Promise<any>} - The result from the service method.
 	 */
 	async invokeServiceMethod(method, ...args) {
-		if(typeof this.service[method] === 'function') {
+		if(typeof this.service !== 'undefined' && typeof this.service[method] === 'function') {
 
 			// Remove the first argument
 			args.shift();
 
 			return await this.service[method](...args);
 		} else if(typeof PrimateService[method] === 'function') {
-			console.log(chalk.bgBlue.black.italic(' ℹ️ INFO '), `${ this.modelName }Service.${ method } not found, using PrimateService`);
+			console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), `${ this.modelName }Service.${ method } not found, using PrimateService`);
 			return await PrimateService[method](...args);
 		} else {
 			throw createError(500, `Method ${ method } not found in service or PrimateService.`);
