@@ -4,77 +4,88 @@ import cors from 'cors'; // Import cors for enabling Cross-Origin Resource Shari
 import helmet from 'helmet'; // Import helmet for securing the app by setting various HTTP headers
 import morgan from 'morgan'; // Import morgan for logging HTTP requests
 
-// Defining the Express app
-const app = express();
+/**
+ * Creates and configures an Express application.
+ *
+ * @param {Object} [options={}] - Configuration options for the application.
+ * @param {Function} [options.preProcess] - A hook function to run before middleware setup.
+ * @param {Function} [options.postProcess] - A hook function to run after middleware setup.
+ * @param {string[]} [options.allowedHeaders] - Additional headers to allow in CORS.
+ * @returns {Object} - The configured Express application instance.
+ */
+const createApp = (options = {}) => {
 
-// Adding Helmet to enhance APIs security
-app.use(helmet({
-	crossOriginEmbedderPolicy: false,
-	crossOriginOpenerPolicy: false,
-	crossOriginResourcePolicy: false,
-}));
+	// Defining the Express app
+	const app = express();
 
-// Middleware to handle JSON parsing with a limit of 10mb
-app.use((req, res, next) => {
-	if(req.originalUrl.startsWith('/raw')) {
+	// check if options has preProcess hook
+	if(typeof options.preProcess === 'function') {
+		options.preProcess(app);
+	}
+
+	// Adding Helmet to enhance APIs security
+	app.use(helmet({
+		crossOriginEmbedderPolicy: false,
+		crossOriginOpenerPolicy: false,
+		crossOriginResourcePolicy: false,
+	}));
+
+	// Middleware to handle JSON parsing with a limit of 10 mb
+	app.use((req, res, next) => {
+		if(req.originalUrl.startsWith('/raw')) {
+			next();
+		} else {
+			express.json({ limit: '10mb' })(req, res, next);
+		}
+	});
+
+	// Define default allowed headers and merge with any provided in options
+	const defaultAllowedHeaders = [ 'Content-Type', 'Authorization', 'Content-Encoding', 'Accept-Encoding' ];
+	const allowedHeaders = Array.isArray(options.allowedHeaders)
+		? [ ...defaultAllowedHeaders, ...options.allowedHeaders ]
+		: defaultAllowedHeaders;
+
+	app.use((req, res, next) => {
+		if(req.method === 'OPTIONS') {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS,DELETE,PATCH');
+			res.header('Access-Control-Allow-Headers', allowedHeaders.join(', '));
+			// If you need to handle pre-flight OPTIONS request, you can respond with status 200
+			return res.status(200).end();
+		}
 		next();
-	} else {
-		express.json({
-			limit: '10mb',
-		})(req, res, next);
-	}
-});
+	});
 
-//app.use(bodyParser.json({ limit: '10mb' }));
-//app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-//app.use(express.json());
+	// Enabling CORS for all requests
+	app.use(cors());
 
-app.use((req, res, next) => {
-	if(req.method === 'OPTIONS') {
-		res.header('Access-Control-Allow-Origin', '*');
-		res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS,DELETE,PATCH');
-		res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Encoding, Accept-Encoding');
-		// If you need to handle pre-flight OPTIONS request, you can respond with status 200
-		return res.status(200).end();
-	}
-	next();
-});
+	// Adding morgan to log HTTP requests in the 'combined' format
+	app.use(morgan('combined'));
 
-// Enabling CORS for all requests
-app.use(cors());
-
-// Adding morgan to log HTTP requests in the 'combined' format
-app.use(morgan('combined'));
-
-// Custom respond method to standardize API responses
-app.response.respond = function({
-	data = {},
-	result = 'success',
-	status = 200,
-	message = '',
-	props = {},
-} = {}) {
-
-	const jsonResponse = {
-		result,
-		status,
-		data,
-		message,
+	// Extend the response object with a custom respond method for standardized API responses
+	app.response.respond = function({
+		data = {},
+		result = 'success',
+		status = 200,
+		message = '',
+		props = {},
+	} = {}) {
+		const responsePayload = {
+			result: status >= 200 && status < 300 ? result : 'error',
+			status,
+			data,
+			message,
+			...props,
+		};
+		return this.contentType('application/json').status(status).send(responsePayload);
 	};
 
-	// If props is an object, merge it with jsonResponse
-	if(typeof props === 'object') {
-		Object.assign(jsonResponse, props);
+	// check if options has postProcess hook
+	if(typeof options.postProcess === 'function') {
+		options.postProcess(app);
 	}
 
-	// If the status is not 2xx, set result to error
-	if(status < 200 || status > 299) {
-		jsonResponse.result = 'error';
-	}
-
-	return this.contentType('application/json')
-		.status(status)
-		.send(jsonResponse);
+	return app;
 };
 
-export default app;
+export default createApp;

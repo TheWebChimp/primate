@@ -1,10 +1,11 @@
 import createError from 'http-errors';
-import PrimateService from '../generics/service.js';
-import fs from 'fs';
-import chalk from 'chalk';
+import PrimateService from '#generics/service.js';
+import { promises as fsp } from 'fs';
+import path from 'path';
 import primate from '../primate.js';
 import pluralize from 'pluralize';
 import * as changeCase from 'change-case';
+import logger from '#utils/logger.js';
 
 /**
  * Generic controller for handling CRUD operations.
@@ -13,49 +14,50 @@ export default class PrimateController {
 
 	/**
 	 * Creates an instance of PrimateController.
-	 *
 	 * @param {string} modelName - The name of the model.
 	 * @param {Object} [options={}] - Optional parameters.
-	 * @param {Object} [options.service] - The service to be used, if not provided, it will be dynamically imported.
+	 * @param {Object} [options.service] - Override service class.
 	 */
 	constructor(modelName, options = {}) {
-
-		//convert camel case to snake case
-		let serviceFileName = modelName.replace(/([A-Z])/g, '-$1').toLowerCase();
-		this.singular = serviceFileName;
-		this.plural = pluralize(this.singular);
-
-		//remove the _ at the beginning if it starts with one
-		if(serviceFileName.charAt(0) === '_') serviceFileName = serviceFileName.substring(1);
-
-		// Dynamically call the service for the model like this: `${modelName}Service` if we don't pass it
-		if(!options.service) {
-			try {
-
-				// check that file exists
-				fs.readFileSync(`./entities/${ this.plural }/${ this.singular }.service.js`);
-
-				// import the service dynamically
-				(async () => {
-					const { default: dynamicController } = await import(`file://${ process.cwd() }/entities/${ this.plural }/${ this.singular }.service.js`);
-					this.service = dynamicController;
-				})();
-
-			} catch(e) {
-				// Chalk warning
-				console.warn(chalk.bgYellow.black.italic(' ⚠️ WARNING '), `The service "${ this.singular }" was not found in the services directory: ${ e }`);
-			}
-		} else {
-
-			this.service = options.service;
+		// Convert CamelCase to kebab-case for filenames
+		let serviceFileName = changeCase.kebabCase(modelName);
+		if(serviceFileName.startsWith('-')) {
+			serviceFileName = serviceFileName.slice(1);
 		}
 
+		this.singular = serviceFileName;
+		this.plural = pluralize(this.singular);
 		this.modelName = modelName;
-
-		// Entity is the model name with the first letter in lowercase
-		this.entity = changeCase.camelCase(modelName);
-
 		this.options = options;
+		this.service = options.service || null;
+
+		// Async-load an entity-specific service if none was provided
+		this._loadService().then(() => {
+			logger.info(`Service for ${ this.modelName } loaded successfully`);
+		});
+	}
+
+	/**
+	 * @private
+	 * Load the service dynamically from the entity directory.
+	 */
+	async _loadService() {
+		if(this.service) return;
+
+		const dir = path.join(process.cwd(), 'entities', this.plural);
+		const fullPath = path.join(dir, `${ this.singular }.service.js`);
+
+		try {
+			await fsp.access(fullPath);
+			const {
+				default: DynamicService,
+			} = await import(`file://${ fullPath }`);
+			this.service = DynamicService;
+		} catch(err) {
+			logger.warn(
+				`Service for "${ this.singular }" not found at ${ fullPath }: ${ err.message }`,
+			);
+		}
 	}
 
 	/**
@@ -85,6 +87,8 @@ export default class PrimateController {
 			}
 		}
 
+		requestOptions.req = req;
+
 		// add the current user id to the data
 		if(req.user) requestOptions.user = req.user.payload;
 
@@ -106,7 +110,7 @@ export default class PrimateController {
 					props: { count },
 				});
 			} else {
-				console.warn(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.all not found, using PrimateService');
+				logger.info(this.modelName + 'Service.all not found, using PrimateService');
 				const { count, data } = await this.invokeServiceMethod('all', this.entity, req.query, requestOptions);
 
 				if(data.length === 0) {
@@ -124,7 +128,7 @@ export default class PrimateController {
 			}
 
 		} catch(e) {
-			console.error(`Error fetching all ${ this.modelName }:`, e);
+			logger.error(`Error fetching all ${ this.modelName }:`, e);
 			const statusCode = e.status || 500;
 			const message = e.message || 'Internal Server Error';
 			next(createError(statusCode, message));
@@ -152,7 +156,7 @@ export default class PrimateController {
 			const record = await this.invokeServiceMethod('create', this.entity, req.body, options);
 
 			if(typeof this.service?.create !== 'function') {
-				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
+				logger.info(this.modelName + 'Service.create not found, using PrimateService');
 			}
 
 			res.respond({
@@ -161,7 +165,7 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
-			console.error('Error creating ' + this.modelName + ': ' + e.message, e);
+			logger.error('Error creating ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error creating ' + this.modelName + ': ' + e.message;
 
 			if(e.code === 'P2002') {
@@ -197,7 +201,7 @@ export default class PrimateController {
 			}
 
 			if(typeof this.service?.get !== 'function') {
-				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
+				logger.info(this.modelName + 'Service.get not found, using PrimateService');
 			}
 
 			if(!record) {
@@ -212,7 +216,7 @@ export default class PrimateController {
 				message: this.modelName + ' retrieved successfully',
 			});
 		} catch(e) {
-			console.error('Error retrieving ' + this.modelName + ': ' + e.message, e);
+			logger.error('Error retrieving ' + this.modelName + ': ' + e.message, e);
 			let message = 'Error retrieving ' + this.modelName + ': ' + e.message;
 
 			return res.respond({
@@ -234,17 +238,17 @@ export default class PrimateController {
 	 * @param {Object} res - Express response object.
 	 */
 	async update(req, res) {
+		const { id } = req.params;
+		const data = { ...req.body };
+		const { user } = req;
+		const { options, entity, modelName } = this;
+
+		if(!id) {
+			logger.error('ID is required to update an item.');
+			throw new Error('ID is required to update an item.');
+		}
+
 		try {
-			const { id } = req.params;
-			const data = { ...req.body };
-			const { user } = req;
-			const { options, entity, modelName } = this;
-
-			if(!id) {
-				console.error('ID is required to update an item.');
-				throw new Error('ID is required to update an item.');
-			}
-
 			// Add the current user id to the data if available
 			if(user) {
 				options.idUser = user.payload.id;
@@ -268,7 +272,7 @@ export default class PrimateController {
 				message: `${ modelName } updated successfully`,
 			});
 		} catch(e) {
-			console.error(`Error updating ${ this.modelName }:`, e);
+			logger.error(`Error updating ${ this.modelName }:`, e);
 
 			let message = `Error updating ${ this.modelName }: ${ e.message }`;
 			if(e.code === 'P2025') {
@@ -328,7 +332,7 @@ export default class PrimateController {
 				message: this.modelName + ' deleted successfully',
 			});
 		} catch(e) {
-			console.error('Error deleting record:', e);
+			logger.error('Error deleting record:', e);
 			return res.respond({
 				status: 500,
 				message: 'Error deleting ' + this.modelName + ': ' + e.message,
@@ -345,17 +349,17 @@ export default class PrimateController {
 	 * @throws {Error} If any error occurs during the service call.
 	 */
 	async serviceCall(req, res) {
+		const { service, functionName } = this;
+
+		if(!service || !functionName) {
+			throw new Error('Service and functionName are required.');
+		}
+
+		if(typeof service[functionName] !== 'function') {
+			throw new Error(`Function "${ functionName }" not found in the service.`);
+		}
+
 		try {
-			const { service, functionName } = this;
-
-			if(!service || !functionName) {
-				throw new Error('Service and functionName are required.');
-			}
-
-			if(typeof service[functionName] !== 'function') {
-				throw new Error(`Function "${ functionName }" not found in the service.`);
-			}
-
 			// Call the service function dynamically
 			const result = await service[functionName](req);
 
@@ -365,7 +369,7 @@ export default class PrimateController {
 			});
 
 		} catch(e) {
-			console.error(`Error calling service function "${ this.functionName }":`, e);
+			logger.error(`Error calling service function "${ functionName }":`, e);
 			res.respond({
 				status: 400,
 				message: `Error calling service: ${ e.message }`,
@@ -416,7 +420,7 @@ export default class PrimateController {
 				message: this.modelName + ' updated successfully',
 			});
 		} catch(e) {
-			console.error('Error updating metadata:', e);
+			logger.error('Error updating metadata:', e);
 			res.respond({
 				status: 500,
 				message: 'Error updating metas for ' + this.modelName + ': ' + e.message,
@@ -439,7 +443,7 @@ export default class PrimateController {
 
 			return await this.service[method](...args);
 		} else if(typeof PrimateService[method] === 'function') {
-			console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), `${ this.modelName }Service.${ method } not found, using PrimateService`);
+			logger.info(`${ this.modelName }Service.${ method } not found, using PrimateService`);
 			return await PrimateService[method](...args);
 		} else {
 			throw createError(500, `Method ${ method } not found in service or PrimateService.`);
