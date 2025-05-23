@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import createError from 'http-errors';
+import config from './config.js';
 
-const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
+const { secret, expiresIn, issuer, algorithm } = config.jwt;
 
 export default {
 	/**
@@ -21,7 +22,11 @@ export default {
 			}
 
 			// Sign the JWT access token
-			jwt.sign({ payload }, accessTokenSecret, {}, (err, token) => {
+			jwt.sign({ payload }, secret, {
+				algorithm,
+				expiresIn,
+				issuer,
+			}, (err, token) => {
 				if(err) {
 					console.error(err);
 					return reject(createError.InternalServerError('Error signing access token.'));
@@ -46,7 +51,7 @@ export default {
 			}
 
 			// Verify the JWT access token
-			jwt.verify(token, accessTokenSecret, (err, payload) => {
+			jwt.verify(token, secret, (err, payload) => {
 				if(err) {
 					console.error('Error verifying access token:', err);
 					const message = err.message;
