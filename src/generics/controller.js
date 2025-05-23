@@ -14,6 +14,7 @@ export default class PrimateController {
 	/**
 	 * Creates an instance of PrimateController.
 	 *
+	 * 
 	 * @param {string} modelName - The name of the model.
 	 * @param {Object} [options={}] - Optional parameters.
 	 * @param {Object} [options.service] - The service to be used, if not provided, it will be dynamically imported.
