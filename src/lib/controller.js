@@ -91,7 +91,7 @@ export default class PrimateController {
 
 		try {
 			// Check if service file exists using async fs
-			await fs.access(servicePath);
+			fs.accessSync(servicePath);
 
 			// Import the service dynamically
 			const serviceModule = await import(`file://${ process.cwd() }/${ servicePath }`);
@@ -103,7 +103,7 @@ export default class PrimateController {
 			if(error.code !== 'ENOENT') {
 				console.warn(
 					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
-					`Failed to load service "${ this.singular }": ${ error.message }`,
+					`Failed to load service "${ this.singular }": ${ error }`,
 				);
 			}
 			// Use default PrimateService - no custom service found
@@ -483,7 +483,7 @@ export default class PrimateController {
 				message: `${ this.modelName } deleted successfully`,
 			});
 		} catch(e) {
-			this._handleError(error, 'deleting', res, next);
+			this._handleError(e, 'deleting', res, next);
 		}
 	};
 
@@ -532,9 +532,10 @@ export default class PrimateController {
 	 * @param {string} req.params.id - The ID of the record to update.
 	 * @param {Object} req.body - The new metadata to update.
 	 * @param {Object} res - Express response object.
+	 * @param {Function} next - Express next middleware function.
 	 * @returns {Object} - The response object.
 	 */
-	async updateMetas(req, res) {
+	async updateMetas(req, res, next) {
 		try {
 			await this._ensureServiceLoaded();
 
@@ -569,7 +570,7 @@ export default class PrimateController {
 				message: `${ this.modelName } metadata updated successfully`,
 			});
 		} catch(e) {
-			this._handleError(error, 'updating metadata for', res, next);
+			this._handleError(e, 'updating metadata for', res, next);
 		}
 	}
 

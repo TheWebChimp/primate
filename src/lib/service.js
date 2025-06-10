@@ -55,7 +55,7 @@ class PrimateService {
 
 		PrimateService.prisma = prismaInstance;
 		PrimateService.orm = orm;
-		console.info(chalk.green('✅ PrimateService initialized successfully'));
+		console.info(chalk.green('✅  PrimateService initialized successfully'));
 	}
 
 	/**
@@ -625,6 +625,13 @@ class PrimateService {
 	 * @param {string|Object} modelOrController - The model name or an instance of a model controller.
 	 * @param {Express.Router} router - The Express router.
 	 * @param options - Optional parameters.
+	 * @param {boolean|Function} [options.disableCreateAuth] - Disable authentication for create route.
+	 * @param {boolean|Function} [options.disableUpdateAuth] - Disable authentication for update route.
+	 * @param {boolean|Function} [options.disableDeleteAuth] - Disable authentication for delete route.
+	 * @param {boolean|Function} [options.disableAllAuth] - Disable authentication for all route.
+	 * @param {boolean|Function} [options.disableGetAuth] - Disable authentication for get route.
+	 * @param {boolean|Function} [options.disableMetasAuth] - Disable authentication for metas update route.
+	 * @param {boolean} [options.disableAuth] - Disable authentication for all routes.
 	 */
 	static prepareCrUDAGRoutes(modelOrController, router, options = {}) {
 		if(!router || typeof router !== 'function') {

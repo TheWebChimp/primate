@@ -185,6 +185,9 @@ const createApp = (options = {}) => {
 		});
 	});
 
+	// Post-processing hook
+	if(typeof options.postProcess === 'function') options.postProcess(app);
+
 	// Global error handler
 	app.use((err, req, res, next) => {
 		console.error(`[${ req.id }] Error:`, err);
@@ -202,17 +205,6 @@ const createApp = (options = {}) => {
 			errors: err.errors || null,
 		});
 	});
-
-	// 404 handler
-	app.use('*', (req, res) => {
-		res.respond({
-			status: 404,
-			message: `Route ${ req.method } ${ req.originalUrl } not found`,
-		});
-	});
-
-	// Post-processing hook
-	if(typeof options.postProcess === 'function') options.postProcess(app);
 
 	return app;
 };

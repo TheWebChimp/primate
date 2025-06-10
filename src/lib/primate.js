@@ -145,6 +145,14 @@ class Primate {
 	 * @param {Function} [callback] - Optional callback function.
 	 */
 	async start(port = config.server.port, callback) {
+
+		this.app.use('*', (req, res) => {
+			res.respond({
+				status: 404,
+				message: `Route ${ req.method } ${ req.originalUrl } not found`,
+			});
+		});
+
 		try {
 
 			// Fallback to a list of ports if env.PORT is not set
@@ -153,11 +161,11 @@ class Primate {
 
 			const server = this.app.listen(availablePort, () => {
 				if(availablePort !== port) {
-					console.warn(chalk.yellow(`⚠️  Port ${ port } is not available, using port ${ availablePort } instead.`));
+					console.warn(chalk.yellow(`⚠️ Port ${ port } is not available, using port ${ availablePort } instead.`));
 				}
 
 				console.info(chalk.white.bgRgb(204, 0, 0).bold(` 🐵 🙈 🙉 🙊 PRIMATE STARTED 🙊 🙉 🙈 🐵 `));
-				console.info(chalk.yellowBright.bgBlack.bold(`Listening on port ${ availablePort }! `));
+				console.info(chalk.yellowBright.bgBlack.bold(`ℹ️ Listening on port ${ availablePort }! `));
 				console.info(chalk.blue(`Health check available at http://localhost:${ availablePort }/health`));
 
 				if(process.env.NODE_ENV === 'development') {
@@ -242,9 +250,9 @@ class Primate {
 			console.info(chalk.blue(`Loading routes from ${ routesDir }...`));
 			const routes = await Primate.importRoutes(routesDir);
 			Primate.setupRoutes(routes, this.app);
-			console.info(chalk.green(`✅ Routes loaded successfully from ${ routesDir }`));
+			console.info(chalk.green(`✅  Routes loaded successfully from ${ routesDir }`));
 		} catch(error) {
-			console.error(chalk.red(`❌ Error setting up routes from ${ routesDir }:`), error);
+			console.error(chalk.red(`❌  Error setting up routes from ${ routesDir }:`), error);
 			throw error;
 		}
 	}
@@ -264,7 +272,7 @@ class Primate {
 		try {
 			const entitiesDir = userConfig.entitiesDir || config.primate.entitiesDir;
 			const prismaClientLocation = userConfig.prismaClientLocation || config.primate.prismaClientLocation;
-			const usePrisma = userConfig.usePrisma !== undefined ? userConfig.usePrisma : config.primate.enablePrisma
+			const usePrisma = userConfig.usePrisma !== undefined ? userConfig.usePrisma : config.primate.enablePrisma;
 
 			this.settings = { ...this.settings, ...config.settings };
 			Primate.settings = this.settings;
@@ -273,9 +281,9 @@ class Primate {
 
 			// Check that the entities directory exists
 			if(!fs.existsSync(entitiesDir)) {
-				console.warn(chalk.yellow(`⚠️  Entities directory not found: ${ entitiesDir }`));
+				console.warn(chalk.yellow(`⚠️ Entities directory not found: ${ entitiesDir }`));
 				if(usePrisma) {
-					console.warn(chalk.yellow('Consider creating the entities directory or disabling Prisma.'));
+					console.warn(chalk.yellow('   Consider creating the entities directory or disabling Prisma.'));
 				}
 			}
 
@@ -287,7 +295,7 @@ class Primate {
 				console.info(chalk.yellow('⚠️💎 Prisma is not enabled'));
 			}
 		} catch(error) {
-			console.error(chalk.red('❌ Failed to setup Primate application:'), error);
+			console.error(chalk.red('❌  Failed to setup Primate application:'), error);
 			throw error;
 		}
 	}
@@ -298,7 +306,7 @@ class Primate {
 	 */
 	async setupPrisma(prismaClientLocation) {
 		try {
-			console.info(chalk.blue('💎 Setting up Prisma...'));
+			console.info(chalk.blue('💎 Setting up Prisma. Location:', prismaClientLocation));
 
 			const prismaClient = await import(prismaClientLocation);
 			this.prisma = new prismaClient.PrismaClient({
@@ -308,7 +316,7 @@ class Primate {
 
 			// Test the connection
 			await this.prisma.$connect();
-			console.info(chalk.green('✅ Prisma client connected successfully'));
+			console.info(chalk.green('✅  Prisma client connected successfully'));
 
 			// Generate ORM object
 			this.orm = Primate.generatePrismaOrmObject(prismaClient.Prisma);
@@ -316,10 +324,10 @@ class Primate {
 
 			// Initialize service
 			PrimateService.initialize(this.prisma, this.orm);
-			console.info(chalk.green('✅ Prisma ORM and service initialized'));
+			console.info(chalk.green('✅  Prisma ORM and service initialized'));
 
 		} catch(error) {
-			console.error(chalk.red('❌ Error setting up Prisma:'), error);
+			console.error(chalk.red('❌  Error setting up Prisma:'), error);
 			throw new Error(`Error setting up Prisma: ${ error.message }`);
 		}
 	}
@@ -336,15 +344,16 @@ class Primate {
 			const entityCount = Object.keys(entities).length;
 
 			if(entityCount === 0) {
-				console.warn(chalk.yellow('⚠️  No entities found'));
-				return;
+				console.warn(chalk.yellow('⚠️ No entities found'));
+			} else {
+				console.info(chalk.green(`✅ ${ entityCount } entities loaded successfully`));
 			}
 
 			Primate.setupRoutes(entities, this.app);
-			console.info(chalk.green(`✅ ${ entityCount } entities loaded successfully`));
+			console.info(chalk.green(`✅  ${ entityCount } entities loaded successfully`));
 
 		} catch(error) {
-			console.error(chalk.red(`❌ Error setting up entities from ${ entitiesDir }:`), error);
+			console.error(chalk.red(`❌  Error setting up entities from ${ entitiesDir }:`), error);
 			throw new Error(`Error setting up entities: ${ error.message }`);
 		}
 	}
@@ -367,7 +376,7 @@ class Primate {
 		try {
 			// Check if directory exists
 			if(!fs.existsSync(directory)) {
-				console.warn(chalk.yellow(`⚠️  Routes directory not found: ${ directory }`));
+				console.warn(chalk.yellow(`⚠️ Routes directory not found: ${ directory }`));
 				return modules;
 			}
 
@@ -384,7 +393,7 @@ class Primate {
 					const router = module.router || module.default;
 
 					if(!router) {
-						console.warn(chalk.yellow(`⚠️  No router exported from ${ file }`));
+						console.warn(chalk.yellow(`⚠️ No router exported from ${ file }`));
 						continue;
 					}
 
@@ -393,7 +402,7 @@ class Primate {
 					modules[moduleName] = router;
 					console.info(chalk.gray(`   📄 Loaded route: ${ moduleName }`));
 				} catch(error) {
-					console.error(chalk.red(`❌ Error importing route ${ file }:`), error);
+					console.error(chalk.red(`❌  Error importing route ${ file }:`), error);
 				}
 			}
 		} catch(error) {
@@ -423,7 +432,7 @@ class Primate {
 		try {
 			// Check if directory exists
 			if(!fs.existsSync(entitiesDir)) {
-				console.warn(chalk.yellow(`⚠️  Entities directory not found: ${ entitiesDir }`));
+				console.warn(chalk.yellow(`⚠️ Entities directory not found: ${ entitiesDir }`));
 				return entities;
 			}
 
@@ -442,7 +451,7 @@ class Primate {
 					// Check if the file exists
 					if(!fs.existsSync(entityFile)) {
 						if(!Primate.settings.suppressEntitiesNotFound) {
-							console.warn(chalk.yellow(`⚠️  Entity file not found: ${ entityFile }`));
+							console.warn(chalk.yellow(`⚠️ Entity file not found: ${ entityFile }`));
 						}
 						continue;
 					}
@@ -452,21 +461,21 @@ class Primate {
 					const router = module.router || module.default;
 
 					if(!router) {
-						console.warn(chalk.yellow(`⚠️  No router exported from ${ entityFile }`));
+						console.warn(chalk.yellow(`⚠️ No router exported from ${ entityFile }`));
 						continue;
 					}
 
 					// Add the router to the entities object
 					entities[entityName] = router;
-					console.info(chalk.gray(`   📦 Loaded entity: ${ entityName }`));
+					console.info(chalk.gray(`    📦 Loaded entity: ${ entityName }`));
 				} catch(e) {
 					// if error contains 'Error: File not found', ignore it
 					if(e.message.includes('File not found')) {
 						if(!Primate.settings.suppressEntitiesNotFound) {
-							console.warn(chalk.yellow(`⚠️  ${ e.message }`));
+							console.warn(chalk.yellow(`⚠️ ${ e.message }`));
 						}
 					} else {
-						console.warn(chalk.yellow(`⚠️  Error in entity "${ file }":`, e.message));
+						console.warn(chalk.yellow(`⚠️ Error in entity "${ file }":`, e.message));
 					}
 				}
 			}
@@ -498,24 +507,25 @@ class Primate {
 
 		// Iterate modules and add them to the app
 		for(const [ moduleName, router ] of Object.entries(modules)) {
+
 			// Validate router
 			if(typeof router !== 'function') {
-				console.error(chalk.red(`❌ Router for module "${ moduleName }" is not a valid function`));
+				console.error(chalk.red(`❌  Router for module "${ moduleName }" is not a valid function`));
 				continue;
 			}
 
 			// If the module name is 'index', 'default' or 'base', add the router to the root of the app
 			if([ 'index', 'default', 'base' ].includes(moduleName)) {
 				app.use('/', router);
-				console.info(chalk.green(`   🌐 Mounted ${ moduleName } routes at /`));
+				console.info(chalk.green(`    🌎 Mounted ${ moduleName } routes at /`));
 				continue;
 			}
 
 			try {
 				app.use(`/${ moduleName }`, router);
-				console.info(chalk.green(`   🌐 Mounted ${ moduleName } routes at /${ moduleName }`));
+				console.info(chalk.green(`    🌎 Mounted ${ moduleName } routes at /${ moduleName }`));
 			} catch(err) {
-				console.error(chalk.red(`❌ Failed to setup route for module "${ moduleName }":`), err);
+				console.error(chalk.red(`❌  Failed to setup route for module "${ moduleName }":`), err);
 			}
 		}
 
@@ -569,7 +579,7 @@ class Primate {
 			});
 		});
 
-		console.info(chalk.green('   🌐 Mounted status route at /'));
+		console.info(chalk.green('    🌎 Mounted status route at /'));
 	}
 
 	/**

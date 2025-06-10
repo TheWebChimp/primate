@@ -83,7 +83,7 @@ export default {
 			}
 
 			// Sign the JWT recovery token
-			jwt.sign({ payload }, accessTokenSecret, { expiresIn: seconds }, (err, token) => {
+			jwt.sign({ payload }, secret, { expiresIn: seconds }, (err, token) => {
 				if(err) {
 					console.error('Error signing recovery token:', err);
 					return reject(createError.InternalServerError('Error signing recovery token.'));
