@@ -1,5 +1,4 @@
 import Primate from './lib/primate.js';
-import auth from './middlewares/auth.js';
 
 // Instantiate and export a Primate instance
 const primate = new Primate();
@@ -7,7 +6,7 @@ const primate = new Primate();
 // Exports -------------------------------------------------------------------------------------------------------------
 
 export { Primate };
-export { auth };
+export { default as auth } from './middlewares/auth.js';
 export { default as PrimateController } from './lib/controller.js';
 export { default as PrimateService } from './lib/service.js';
 export { default as jwt } from './utils/jwt.js';

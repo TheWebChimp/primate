@@ -17,8 +17,8 @@ function validateRequiredEnvVars(required) {
  * Converts string to integer with validation
  * @param {string} value - The string value to convert
  * @param {number} defaultValue - Default value if conversion fails
- * @param {number} min - Minimum allowed value
- * @param {number} max - Maximum allowed value
+ * @param {number|null} min - Minimum allowed value
+ * @param {number|null} max - Maximum allowed value
  * @returns {number} Parsed integer
  */
 function parseIntWithValidation(value, defaultValue, min = null, max = null) {
@@ -87,8 +87,8 @@ const config = {
 
 	// Server configuration
 	server: {
-		port: parseIntWithValidation(process.env.PORT, 3000, 1000, 65535),
-		fallbackPorts: parseArray(process.env.FALLBACK_PORTS, [ '1337', '8008', '10101' ]).map(p => parseInt(p, 10)),
+		port: parseIntWithValidation(process.env.PORT, 1337, 1000, 65535),
+		fallbackPorts: parseArray(process.env.FALLBACK_PORTS, [ '8008', '10101' ]).map(p => parseInt(p, 10)),
 		host: process.env.HOST || '0.0.0.0',
 		bodyLimit: process.env.BODY_LIMIT || '10mb',
 		timeout: parseIntWithValidation(process.env.SERVER_TIMEOUT, 30000, 1000, 300000), // 30s default, max 5min
@@ -203,9 +203,9 @@ function validateConfig() {
 	}
 
 	// Check database URL in production
-	if(isProduction && !config.database.url) {
+	/*if(isProduction && !config.database.url) {
 		errors.push('DATABASE_URL is required in production');
-	}
+	}*/
 
 	// Check session secret in production
 	if(isProduction && !config.security.sessionSecret) {

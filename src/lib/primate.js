@@ -146,11 +146,16 @@ class Primate {
 	 */
 	async start(port = config.server.port, callback) {
 		try {
+
 			// Fallback to a list of ports if env.PORT is not set
 			const ports = port ? [ port, ...config.server.fallbackPorts ] : config.server.fallbackPorts;
 			const availablePort = await getPort({ port: ports });
 
 			const server = this.app.listen(availablePort, () => {
+				if(availablePort !== port) {
+					console.warn(chalk.yellow(`⚠️  Port ${ port } is not available, using port ${ availablePort } instead.`));
+				}
+
 				console.info(chalk.white.bgRgb(204, 0, 0).bold(` 🐵 🙈 🙉 🙊 PRIMATE STARTED 🙊 🙉 🙈 🐵 `));
 				console.info(chalk.yellowBright.bgBlack.bold(`Listening on port ${ availablePort }! `));
 				console.info(chalk.blue(`Health check available at http://localhost:${ availablePort }/health`));

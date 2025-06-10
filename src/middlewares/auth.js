@@ -1,4 +1,4 @@
-import jwt from '../jwt.js';
+import jwt from '../utils/jwt.js';
 
 /**
  * Authentication middleware to verify JWT tokens.
