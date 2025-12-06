@@ -1,6 +1,6 @@
 {
 	"name": "@thewebchimp/primate",
-	"version": "1.0.10-claude",
+	"version": "1.0.11-claude",
 	"description": "Framework built on top of Express and Prisma to get your project going",
 	"main": "./src/index.js",
 	"exports": "./src/index.js",
@@ -18,7 +18,7 @@
 	"license": "ISC",
 	"dependencies": {
 		"@prisma/client": "^5.20.0",
-		"body-parser": "^1.20.2",
+		"body-parser": "2.2.1",
 		"chalk": "^5.3.0",
 		"change-case": "^5.4.4",
 		"compression": "^1.8.0",
