@@ -285,18 +285,16 @@ export default class PrimateController {
 					status: 200, // Changed from 404 - empty results are valid
 					data: [],
 					message: `No ${ this.plural } found`,
-					meta: { count: 0 },
+					count: 0,
 				});
 			}
 
 			return res.respond({
 				data: result.data,
 				message: `${ this.modelName } retrieved successfully`,
-				meta: {
-					count: result.count,
-					page: processedQuery.page || 1,
-					limit: processedQuery.limit || 100,
-				},
+				count: result.count,
+				page: processedQuery.page || 1,
+				limit: processedQuery.limit || 100,
 			});
 
 		} catch(error) {

@@ -112,6 +112,13 @@ const config = {
 		algorithm: process.env.JWT_ALGORITHM || 'HS256',
 	},
 
+	// Authentication configuration
+	auth: {
+		masterToken: process.env.MASTER_TOKEN,
+		logMasterTokenUsage: parseBoolean(process.env.LOG_MASTER_TOKEN_USAGE, isDevelopment),
+		masterTokenMinLength: 32, // Minimum length for master token
+	},
+
 	// API configuration
 	api: {
 		// Pagination
@@ -206,6 +213,16 @@ function validateConfig() {
 	/*if(isProduction && !config.database.url) {
 		errors.push('DATABASE_URL is required in production');
 	}*/
+
+	// Check master token length if provided
+	if(config.auth.masterToken && config.auth.masterToken.length < config.auth.masterTokenMinLength) {
+		errors.push(`Master token should be at least ${ config.auth.masterTokenMinLength } characters long`);
+	}
+
+	// Warn if master token is used in production without proper security measures
+	if(isProduction && config.auth.masterToken && !config.auth.logMasterTokenUsage) {
+		console.warn('⚠️  Master token is configured in production but usage logging is disabled. Consider enabling LOG_MASTER_TOKEN_USAGE=true for security monitoring.');
+	}
 
 	// Check session secret in production
 	if(isProduction && !config.security.sessionSecret) {

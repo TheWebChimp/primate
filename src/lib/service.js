@@ -857,14 +857,14 @@ class PrimateService {
 				const [ relation, subfield ] = field.split('.');
 				if(modelFields.hasOwnProperty(relation)) {
 					orConditions.push({
-						[relation]: { [subfield]: { contains: searchTerm, mode: 'insensitive' } },
+						[relation]: { [subfield]: { contains: searchTerm } },
 					});
 				}
 			} else if(modelFields.hasOwnProperty(field)) {
 				// Handle direct fields
 				if(modelFields[field] === 'String') {
 					orConditions.push({
-						[field]: { contains: searchTerm, mode: 'insensitive' },
+						[field]: { contains: searchTerm },
 					});
 				} else if(modelFields[field] === 'Int' && !isNaN(parseInt(searchTerm, 10))) {
 					orConditions.push({ [field]: parseInt(searchTerm, 10) });

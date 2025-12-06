@@ -475,6 +475,7 @@ class Primate {
 							console.warn(chalk.yellow(`⚠️ ${ e.message }`));
 						}
 					} else {
+						console.error(chalk.red(`❌  Error importing entity ${ file }:`), e);
 						console.warn(chalk.yellow(`⚠️ Error in entity "${ file }":`, e.message));
 					}
 				}
