@@ -1,6 +1,6 @@
 {
 	"name": "@thewebchimp/primate",
-	"version": "1.0.11-claude",
+	"version": "1.2.0",
 	"description": "Framework built on top of Express and Prisma to get your project going",
 	"main": "./src/index.js",
 	"exports": "./src/index.js",
@@ -13,7 +13,7 @@
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
-	"keywords": [],
+	"keywords": [ ],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
