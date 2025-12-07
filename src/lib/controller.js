@@ -1,5 +1,4 @@
 import createError from 'http-errors';
-import fs from 'fs';
 import chalk from 'chalk';
 import pluralize from 'pluralize';
 import * as changeCase from 'change-case';
@@ -10,7 +9,7 @@ import PrimateService from './service.js';
 /**
  * @typedef {Object} ControllerOptions
  * @property {Object} [service] - Custom service instance
- * @property {string[]} [queryableFields] - Fields that can be searched
+ * @property {string[]} [queryableFields] - Fields that can be searched (aliases: filterFields, qFields)
  * @property {Object} [include] - Default relations to include
  * @property {Function} [filterCreateData] - Function to filter create data
  * @property {Function} [filterUpdateData] - Function to filter update data
@@ -32,7 +31,7 @@ export default class PrimateController {
 	 * @param {string} modelName - The name of the model.
 	 * @param {Object} [options={}] - Optional parameters.
 	 * @param {Object} [options.service] - The service to be used, if not provided, it will be dynamically imported.
-	 * @param {string[]} [options.queryableFields] - Fields that can be searched.
+	 * @param {string[]} [options.queryableFields] - Fields that can be searched (aliases: filterFields, qFields).
 	 * @param {Object} [options.include] - Default relations to include.
 	 * @param {Function} [options.filterCreateData] - Function to filter create data.
 	 * @param {Function} [options.filterUpdateData] - Function to filter update data.
@@ -90,17 +89,14 @@ export default class PrimateController {
 		const servicePath = `./entities/${ this.plural }/${ this.singular }.service.js`;
 
 		try {
-			// Check if service file exists using async fs
-			fs.accessSync(servicePath);
-
-			// Import the service dynamically
+			// Import the service dynamically - let import() handle file existence
 			const serviceModule = await import(`file://${ process.cwd() }/${ servicePath }`);
 			this.service = serviceModule.default;
 			this.serviceLoaded = true;
 
 			console.info(chalk.green(`✅ Loaded custom service for ${ this.modelName }`));
 		} catch(error) {
-			if(error.code !== 'ENOENT') {
+			if(error.code !== 'ERR_MODULE_NOT_FOUND' && error.code !== 'ENOENT') {
 				console.warn(
 					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
 					`Failed to load service "${ this.singular }": ${ error }`,
@@ -326,10 +322,6 @@ export default class PrimateController {
 
 			const record = await this.invokeServiceMethod('create', this.entity, processedData, options);
 
-			if(typeof this.service?.create !== 'function') {
-				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.create not found, using PrimateService');
-			}
-
 			res.respond({
 				status: 201,
 				data: record,
@@ -364,17 +356,6 @@ export default class PrimateController {
 
 			const processedQuery = this._processQueryParams(req.query);
 			const record = await this.invokeServiceMethod('get', this.entity, id, processedQuery, this.options);
-			if(!record) {
-				return res.respond({
-					status: 404,
-					message: `${ this.modelName } not found`,
-				});
-			}
-
-			if(typeof this.service?.get !== 'function') {
-				console.info(chalk.bgBlue.black.italic(' ℹ️ INFO '), this.modelName + 'Service.get not found, using PrimateService');
-			}
-
 			if(!record) {
 				return res.respond({
 					status: 404,

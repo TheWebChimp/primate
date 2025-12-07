@@ -15,10 +15,10 @@ import config from '../utils/config.js';
  * @property {Function} [filterResultData] - Function to filter result data
  * @property {Function} [filterAllQuery] - Function to filter query object
  * @property {Object} [upsertRules] - Rules for upsert operations
- * @property {string[]} [queryableFields] - Fields that can be searched
+ * @property {string[]} [queryableFields] - Fields that can be searched (aliases: filterFields, qFields)
  * @property {Object} [include] - Default relations to include
  * @property {Object} [where] - Additional where conditions
- * @property {string} [searchField] - Field to search when ID is not numeric
+ * @property {string} [searchField] - Field to search when ID is not numeric (alias: singleField)
  * @property {Function} [resolveWhere] - Custom where clause resolver
  * @property {number} [idUser] - Current user ID
  */
@@ -45,6 +45,20 @@ class PrimateService {
 		beforeGet: [],
 		afterGet: [],
 	};
+
+	/**
+	 * Resolve option aliases to their canonical names
+	 * @private
+	 * @param {ServiceOptions} options - Options object
+	 * @returns {ServiceOptions} Options with aliases resolved
+	 */
+	static _resolveOptionAliases(options = {}) {
+		return {
+			...options,
+			queryableFields: options.queryableFields || options.filterFields || options.qFields,
+			searchField: options.searchField || options.singleField,
+		};
+	}
 
 	/**
 	 * Initialize service with Prisma instance and ORM
@@ -333,6 +347,7 @@ class PrimateService {
 	 * @throws {Error} If any error occurs during the update.
 	 */
 	static async update(model, id, data, options = {}) {
+		options = this._resolveOptionAliases(options);
 		const normalizedModel = this._validateModel(model);
 		if(!id) throw createError.BadRequest('ID is required for update operation');
 
@@ -404,15 +419,16 @@ class PrimateService {
 	 * @returns {Promise<T>} The deleted record.
 	 * @throws {Error} If any required parameter is missing or an error occurs during deletion.
 	 */
-	static async delete(model, id) {
+	static async delete(model, id, options = {}) {
+		options = this._resolveOptionAliases(options);
 		const normalizedModel = this._validateModel(model);
 		if(!id) throw createError.BadRequest('ID is required for delete operation');
 
-		const context = { model: normalizedModel, id };
+		const context = { model: normalizedModel, id, options };
 		await this.runHooks('beforeDelete', context);
 
 		try {
-			const where = this.resolveWhere(normalizedModel, id);
+			const where = this._buildWhereClause(normalizedModel, id, options);
 			const record = await this.prisma[normalizedModel].delete({ where });
 
 			await this.runHooks('afterDelete', { ...context, record });
@@ -444,6 +460,7 @@ class PrimateService {
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
 	static async all(model, query = {}, options = {}) {
+		options = this._resolveOptionAliases(options);
 		const normalizedModel = this._validateModel(model);
 
 		const context = { model: normalizedModel, query, options };
@@ -554,6 +571,7 @@ class PrimateService {
 	 * @throws {Error} If any required parameter is missing or an error occurs during retrieval.
 	 */
 	static async get(model, id, query = {}, options = {}) {
+		options = this._resolveOptionAliases(options);
 		const normalizedModel = this._validateModel(model);
 
 		if(!id) throw createError.BadRequest('ID is required for get operation');
@@ -708,8 +726,8 @@ class PrimateService {
 				throw createError.NotFound(`${ model } not found`);
 			}
 
-			// Merge metadata
-			const mergedMetas = { ...current.metas, ...metas };
+			// Merge metadata (handle null metas)
+			const mergedMetas = { ...(current.metas || {}), ...metas };
 
 			// Update record
 			return await this.prisma[normalizedModel].update({
@@ -905,9 +923,11 @@ class PrimateService {
 								lte: parseFloat(max) || undefined,
 							};
 						} else if(fieldType === 'DateTime') {
+							const minDate = new Date(min);
+							const maxDate = new Date(max);
 							where[field] = {
-								gte: new Date(min) || undefined,
-								lte: new Date(max) || undefined,
+								gte: isNaN(minDate.getTime()) ? undefined : minDate,
+								lte: isNaN(maxDate.getTime()) ? undefined : maxDate,
 							};
 						}
 					}

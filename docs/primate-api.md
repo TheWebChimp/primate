@@ -16,7 +16,7 @@ List all records with pagination, sorting, search, and filtering.
 | `limit` | number | 100 | Records per page (max 1000) |
 | `by` | string | 'id' | Field to sort by |
 | `order` | string | 'desc' | Sort direction: 'asc' or 'desc' |
-| `q` | string | - | Search term (searches queryableFields) |
+| `q` | string | - | Search term (searches queryableFields, aliases: filterFields, qFields) |
 | `count` | boolean | false | Return only count, no data |
 | `select` | string | - | Comma-separated fields to include |
 | `{field}` | any | - | Filter by exact field value |

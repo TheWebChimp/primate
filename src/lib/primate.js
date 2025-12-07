@@ -345,12 +345,10 @@ class Primate {
 
 			if(entityCount === 0) {
 				console.warn(chalk.yellow('⚠️ No entities found'));
-			} else {
-				console.info(chalk.green(`✅ ${ entityCount } entities loaded successfully`));
 			}
 
 			Primate.setupRoutes(entities, this.app);
-			console.info(chalk.green(`✅  ${ entityCount } entities loaded successfully`));
+			console.info(chalk.green(`✅ ${ entityCount } entities loaded successfully`));
 
 		} catch(error) {
 			console.error(chalk.red(`❌  Error setting up entities from ${ entitiesDir }:`), error);

@@ -52,8 +52,8 @@ import { Primate } from '@thewebchimp/primate';
 const router = Primate.getRouter();
 
 Primate.setupRoute('user', router, {
-  searchField: ['username', 'email'],
-  queryableFields: ['status', 'role'],
+  searchField: ['username', 'email'],  // alias: singleField
+  queryableFields: ['status', 'role'], // aliases: filterFields, qFields
   // Auth options:
   // disableAuth: true,           // Disable all auth
   // disableCreateAuth: true,     // Public create
@@ -112,7 +112,7 @@ GET /users?q=john&status=active&role=admin
 
 | Param | Description |
 |-------|-------------|
-| `q` | Search across queryableFields |
+| `q` | Search across queryableFields (aliases: filterFields, qFields) |
 | `count` | Return only count, no data |
 | `select` | Comma-separated fields to include |
 | `{field}` | Filter by exact field value |

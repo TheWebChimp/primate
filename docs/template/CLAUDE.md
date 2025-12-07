@@ -57,8 +57,8 @@ import { Primate } from '@thewebchimp/primate';
 const router = Primate.getRouter();
 
 Primate.setupRoute('{model}', router, {
-  searchField: ['field1', 'field2'],      // Fields for ?q= search
-  queryableFields: ['status', 'type'],    // Fields for filtering
+  searchField: ['field1', 'field2'],      // Fields for single lookup (alias: singleField)
+  queryableFields: ['status', 'type'],    // Fields for ?q= search (aliases: filterFields, qFields)
   // disableAuth: true,                   // Make all endpoints public
   // disableCreateAuth: true,             // Public create only
   // disableGetAuth: true,                // Public read only

@@ -54,8 +54,8 @@ const router = Primate.getRouter();
 
 Primate.setupRoute('user', router, {
   // Search configuration
-  searchField: ['username', 'email', 'name'],  // Fields for ?q= search
-  queryableFields: ['status', 'role', 'type'], // Fields for filtering
+  searchField: ['username', 'email', 'name'],  // Fields for single lookup (alias: singleField)
+  queryableFields: ['status', 'role', 'type'], // Fields for ?q= search (aliases: filterFields, qFields)
 
   // Authentication options
   disableAuth: false,           // Disable all auth (default: false)
@@ -81,8 +81,8 @@ import { Primate, PrimateService, auth } from '@thewebchimp/primate';
 const router = Primate.getRouter();
 
 Primate.setupRoute('user', router, {
-  searchField: ['username', 'email'],
-  queryableFields: ['status', 'role']
+  searchField: ['username', 'email'],  // alias: singleField
+  queryableFields: ['status', 'role']  // aliases: filterFields, qFields
 });
 
 // Custom endpoint: Get current user
