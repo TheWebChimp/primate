@@ -9,6 +9,19 @@ import Primate from './primate.js';
 import config from '../utils/config.js';
 
 /**
+ * Input validation constants to prevent abuse and DoS attacks
+ */
+const VALIDATION_LIMITS = {
+	MAX_SEARCH_TERM_LENGTH: 500,
+	MAX_FILTER_VALUE_LENGTH: 1000,
+	MAX_ARRAY_VALUES: 100,
+	MAX_PAGE_LIMIT: 1000,
+	MIN_PAGE: 1,
+	MAX_FIELD_NAME_LENGTH: 64,
+	ALLOWED_FIELD_NAME_PATTERN: /^[a-zA-Z_][a-zA-Z0-9_.]*$/,
+};
+
+/**
  * @typedef {Object} ServiceOptions
  * @property {Function} [filterCreateData] - Function to filter create data
  * @property {Function} [filterUpdateData] - Function to filter update data
@@ -171,7 +184,7 @@ class PrimateService {
 
 		const processedData = { ...data };
 
-		for(const [ relation, relationData ] of Object.entries(relations)) {
+		for(const [relation, relationData] of Object.entries(relations)) {
 			// Handle one-to-many relations
 			if(relationData.type === 'one-to-many' && processedData[relationData.field]) {
 				processedData[relationData.model] = {
@@ -231,8 +244,8 @@ class PrimateService {
 
 		// Find relations to disconnect
 		const toDisconnect = currentRelations
-			.filter(current => !newRelations.includes(current.id))
-			.map(item => ({ id: item.id }));
+		.filter(current => !newRelations.includes(current.id))
+		.map(item => ({ id: item.id }));
 
 		// Build relation update object
 		const relationUpdate = {
@@ -288,7 +301,7 @@ class PrimateService {
 
 			// Handle upsert rules
 			if(options.upsertRules) {
-				for(const [ field, rule ] of Object.entries(options.upsertRules)) {
+				for(const [field, rule] of Object.entries(options.upsertRules)) {
 					if(rule.slugify && processedData[rule.slugify]) {
 						processedData[field] = slugify(processedData[rule.slugify], { lower: true });
 					}
@@ -353,7 +366,7 @@ class PrimateService {
 			const relations = modelFields.relations;
 
 			if(relations) {
-				for(const [ relation, relationData ] of Object.entries(relations)) {
+				for(const [relation, relationData] of Object.entries(relations)) {
 					// Handle one-to-many relations
 					if(relationData.type === 'one-to-many' && processedData[relationData.field]) {
 						processedData[relationData.model] = {
@@ -605,7 +618,7 @@ class PrimateService {
 		const sanitized = {};
 
 		// Only include fields that exist in the model
-		Object.entries(data).forEach(([ field, value ]) => {
+		Object.entries(data).forEach(([field, value]) => {
 			if(modelObject.hasOwnProperty(field) || field === 'metas') {
 				sanitized[field] = value;
 			} else {
@@ -838,6 +851,41 @@ class PrimateService {
 	}
 
 	/**
+	 * Validate and sanitize a field name
+	 * @private
+	 * @param {string} field - Field name to validate
+	 * @returns {boolean} True if valid field name
+	 */
+	static _isValidFieldName(field) {
+		if(typeof field !== 'string') return false;
+		if(field.length > VALIDATION_LIMITS.MAX_FIELD_NAME_LENGTH) return false;
+		return VALIDATION_LIMITS.ALLOWED_FIELD_NAME_PATTERN.test(field);
+	}
+
+	/**
+	 * Validate search term
+	 * @private
+	 * @param {string} searchTerm - Search term to validate
+	 * @returns {string} Sanitized search term
+	 */
+	static _validateSearchTerm(searchTerm) {
+		if(typeof searchTerm !== 'string') return '';
+		// Truncate to max length
+		return searchTerm.slice(0, VALIDATION_LIMITS.MAX_SEARCH_TERM_LENGTH).trim();
+	}
+
+	/**
+	 * Validate filter value
+	 * @private
+	 * @param {string} value - Filter value to validate
+	 * @returns {string} Sanitized filter value
+	 */
+	static _validateFilterValue(value) {
+		if(typeof value !== 'string') return value;
+		return value.slice(0, VALIDATION_LIMITS.MAX_FILTER_VALUE_LENGTH);
+	}
+
+	/**
 	 * Build search query for full-text search
 	 * @private
 	 */
@@ -845,29 +893,40 @@ class PrimateService {
 		const modelFields = this.getORMObject(model);
 		const orConditions = [];
 
-		// Add ID search if term is numeric
-		if(!isNaN(parseInt(searchTerm, 10))) {
-			orConditions.push({ id: parseInt(searchTerm, 10) });
+		// Validate and sanitize search term
+		const sanitizedTerm = this._validateSearchTerm(searchTerm);
+		if(!sanitizedTerm) return orConditions;
+
+		// Add ID search if term is numeric and within safe integer range
+		const numericId = parseInt(sanitizedTerm, 10);
+		if(!isNaN(numericId) && Number.isSafeInteger(numericId) && numericId > 0) {
+			orConditions.push({ id: numericId });
 		}
 
 		// Build field-specific search conditions
 		queryableFields.forEach(field => {
+			// Validate field name
+			if(!this._isValidFieldName(field)) return;
+
 			if(field.includes('.')) {
 				// Handle relation fields
-				const [ relation, subfield ] = field.split('.');
-				if(modelFields.hasOwnProperty(relation)) {
+				const [relation, subfield] = field.split('.');
+				if(this._isValidFieldName(relation) && this._isValidFieldName(subfield) && modelFields.hasOwnProperty(relation)) {
 					orConditions.push({
-						[relation]: { [subfield]: { contains: searchTerm } },
+						[relation]: { [subfield]: { contains: sanitizedTerm } },
 					});
 				}
 			} else if(modelFields.hasOwnProperty(field)) {
 				// Handle direct fields
 				if(modelFields[field] === 'String') {
 					orConditions.push({
-						[field]: { contains: searchTerm },
+						[field]: { contains: sanitizedTerm },
 					});
-				} else if(modelFields[field] === 'Int' && !isNaN(parseInt(searchTerm, 10))) {
-					orConditions.push({ [field]: parseInt(searchTerm, 10) });
+				} else if(modelFields[field] === 'Int') {
+					const numValue = parseInt(sanitizedTerm, 10);
+					if(!isNaN(numValue) && Number.isSafeInteger(numValue)) {
+						orConditions.push({ [field]: numValue });
+					}
 				}
 			}
 		});
@@ -883,37 +942,72 @@ class PrimateService {
 		const modelFields = this.orm[model];
 		const where = { ...existingWhere };
 
-		Object.entries(modelFields).forEach(([ field, fieldType ]) => {
+		Object.entries(modelFields).forEach(([field, fieldType]) => {
+			// Validate field name
+			if(!this._isValidFieldName(field)) return;
+
 			if(query[field] !== undefined && field !== 'relations') {
-				const value = query[field];
+				let value = query[field];
 
 				if(typeof value === 'string') {
+					// Validate and sanitize the value
+					value = this._validateFilterValue(value);
+
 					// Handle comma-separated values (IN operator)
 					if(value.includes(',')) {
-						where[field] = { in: value.split(',').map(v => v.trim()) };
+						const values = value.split(',').map(v => v.trim());
+						// Limit array size to prevent DoS
+						if(values.length > VALIDATION_LIMITS.MAX_ARRAY_VALUES) {
+							where[field] = { in: values.slice(0, VALIDATION_LIMITS.MAX_ARRAY_VALUES) };
+						} else {
+							where[field] = { in: values };
+						}
 					}
 					// Handle pipe-separated values (array contains)
 					else if(value.includes('|')) {
-						where[field] = { has: value.split('|').map(v => v.trim()) };
+						const values = value.split('|').map(v => v.trim());
+						// Limit array size to prevent DoS
+						if(values.length > VALIDATION_LIMITS.MAX_ARRAY_VALUES) {
+							where[field] = { has: values.slice(0, VALIDATION_LIMITS.MAX_ARRAY_VALUES) };
+						} else {
+							where[field] = { has: values };
+						}
 					}
 					// Handle range queries for numbers and dates
 					else if(value.includes('..')) {
-						const [ min, max ] = value.split('..');
+						const [min, max] = value.split('..');
 						if(fieldType === 'Int' || fieldType === 'Float') {
-							where[field] = {
-								gte: parseFloat(min) || undefined,
-								lte: parseFloat(max) || undefined,
-							};
+							const minNum = parseFloat(min);
+							const maxNum = parseFloat(max);
+							// Validate numeric values are within safe range
+							const rangeQuery = {};
+							if(!isNaN(minNum) && isFinite(minNum)) rangeQuery.gte = minNum;
+							if(!isNaN(maxNum) && isFinite(maxNum)) rangeQuery.lte = maxNum;
+							if(Object.keys(rangeQuery).length > 0) {
+								where[field] = rangeQuery;
+							}
 						} else if(fieldType === 'DateTime') {
-							where[field] = {
-								gte: new Date(min) || undefined,
-								lte: new Date(max) || undefined,
-							};
+							const minDate = new Date(min);
+							const maxDate = new Date(max);
+							const rangeQuery = {};
+							// Validate dates are valid
+							if(!isNaN(minDate.getTime())) rangeQuery.gte = minDate;
+							if(!isNaN(maxDate.getTime())) rangeQuery.lte = maxDate;
+							if(Object.keys(rangeQuery).length > 0) {
+								where[field] = rangeQuery;
+							}
 						}
 					}
 					// Simple equality
 					else {
-						where[field] = fieldType === 'Int' ? parseInt(value, 10) : value;
+						if(fieldType === 'Int') {
+							const numValue = parseInt(value, 10);
+							if(!isNaN(numValue) && Number.isSafeInteger(numValue)) {
+								where[field] = numValue;
+							}
+						} else {
+							where[field] = value;
+						}
 					}
 				} else {
 					where[field] = value;
@@ -939,13 +1033,13 @@ class PrimateService {
 		if(options.searchField && isNaN(parseInt(id, 10))) {
 			const searchFields = Array.isArray(options.searchField)
 				? options.searchField
-				: [ options.searchField ];
+				: [options.searchField];
 
 			const searchConditions = searchFields
-				.filter(field => modelFields.hasOwnProperty(field))
-				.map(field => ({
-					[field]: modelFields[field] === 'Int' ? parseInt(id, 10) : id,
-				}));
+			.filter(field => modelFields.hasOwnProperty(field))
+			.map(field => ({
+				[field]: modelFields[field] === 'Int' ? parseInt(id, 10) : id,
+			}));
 
 			return searchConditions.length === 1
 				? searchConditions[0]
@@ -1000,8 +1094,8 @@ class PrimateService {
 
 		// Handle fetch-* parameters
 		const fetchKeys = Object.keys(query)
-			.filter(key => key.startsWith('fetch-'))
-			.sort();
+		.filter(key => key.startsWith('fetch-'))
+		.sort();
 
 		const modelFields = this.orm[model];
 

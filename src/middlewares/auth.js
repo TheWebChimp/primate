@@ -1,4 +1,23 @@
+import crypto from 'crypto';
 import jwt from '../utils/jwt.js';
+
+/**
+ * Performs a timing-safe comparison of two tokens.
+ * Prevents timing attacks by ensuring comparison takes constant time.
+ *
+ * @param {string} a - First token to compare.
+ * @param {string} b - Second token to compare.
+ * @returns {boolean} True if tokens match, false otherwise.
+ */
+const safeCompare = (a, b) => {
+	if(typeof a !== 'string' || typeof b !== 'string') {
+		return false;
+	}
+	if(a.length !== b.length) {
+		return false;
+	}
+	return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+};
 
 /**
  * Authentication middleware to verify JWT tokens.
@@ -32,7 +51,7 @@ const auth = async (req, res, next) => {
 		// Check if master token is provided and matches environment variable
 		const masterToken = process.env.MASTER_TOKEN;
 
-		if(masterToken && token === masterToken) {
+		if(masterToken && safeCompare(token, masterToken)) {
 			// Set a special user object for master token
 			req.user = {
 				payload: {
@@ -72,7 +91,7 @@ const auth = async (req, res, next) => {
 		} else {
 			res.respond({
 				status: 401,
-				message: 'Unathorized: ' + e.message,
+				message: 'Unauthorized: ' + e.message,
 			});
 		}
 	}
@@ -111,7 +130,7 @@ const masterOnly = async (req, res, next) => {
 			});
 		}
 
-		if (token !== masterToken) {
+		if (!safeCompare(token, masterToken)) {
 			return res.respond({
 				status: 403,
 				message: 'Forbidden: Invalid master token.',

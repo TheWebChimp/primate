@@ -108,7 +108,7 @@ export default {
 			}
 
 			// Verify the JWT recovery token
-			jwt.verify(token, accessTokenSecret, (err, payload) => {
+			jwt.verify(token, secret, (err, payload) => {
 				if(err) {
 					const message = err.name === 'JsonWebTokenError' ? 'Unauthorized' : err.message;
 					return reject(createError.Unauthorized(message));

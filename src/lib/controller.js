@@ -1,5 +1,5 @@
 import createError from 'http-errors';
-import fs from 'fs';
+import fs from 'fs/promises';
 import chalk from 'chalk';
 import pluralize from 'pluralize';
 import * as changeCase from 'change-case';
@@ -91,7 +91,7 @@ export default class PrimateController {
 
 		try {
 			// Check if service file exists using async fs
-			fs.accessSync(servicePath);
+			await fs.access(servicePath);
 
 			// Import the service dynamically
 			const serviceModule = await import(`file://${ process.cwd() }/${ servicePath }`);

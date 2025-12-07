@@ -11,14 +11,24 @@
 		"url": "https://github.com/TheWebChimp/primate.git"
 	},
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+		"test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+		"test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
 	},
-	"keywords": [ ],
-	"author": "",
-	"license": "ISC",
+	"keywords": [
+		"express",
+		"prisma",
+		"framework",
+		"rest-api",
+		"crud",
+		"orm",
+		"nodejs",
+		"backend"
+	],
+	"author": "TheWebChimp",
+	"license": "MIT",
 	"dependencies": {
 		"@prisma/client": "^5.20.0",
-		"body-parser": "2.2.1",
 		"chalk": "^5.3.0",
 		"change-case": "^5.4.4",
 		"compression": "^1.8.0",
@@ -33,7 +43,12 @@
 		"jsonwebtoken": "^9.0.2",
 		"morgan": "^1.10.0",
 		"pluralize": "^8.0.0",
-		"prisma": "^5.20.0",
 		"slugify": "^1.6.6"
+	},
+	"devDependencies": {
+		"jest": "^29.7.0"
+	},
+	"engines": {
+		"node": ">=18.0.0"
 	}
 }

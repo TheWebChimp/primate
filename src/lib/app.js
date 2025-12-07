@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -125,9 +126,9 @@ const createApp = (options = {}) => {
 	const logFormat = options.logFormat || 'combined';
 	app.use(morgan(logFormat));
 
-	// Request ID middleware for better tracing
+	// Request ID middleware for better tracing (using crypto for secure IDs)
 	app.use((req, res, next) => {
-		req.id = Math.random().toString(36).substr(2, 9);
+		req.id = crypto.randomUUID();
 		res.setHeader('X-Request-ID', req.id);
 		next();
 	});
