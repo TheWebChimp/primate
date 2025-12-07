@@ -9,7 +9,7 @@ import jwt from '../utils/jwt.js';
  * @throws {Error} If any error occurs during token verification.
  */
 
-const auth = async (req, res, next) => {
+const auth = async(req, res, next) => {
 	try {
 		// Validate the Authorization header
 		const authHeader = req.headers.authorization;
@@ -72,7 +72,7 @@ const auth = async (req, res, next) => {
 		} else {
 			res.respond({
 				status: 401,
-				message: 'Unathorized: ' + e.message,
+				message: 'Unauthorized: ' + e.message,
 			});
 		}
 	}
@@ -85,10 +85,10 @@ const auth = async (req, res, next) => {
  * @param {Object} res - Express response object.
  * @param {Function} next - Express next middleware function.
  */
-const masterOnly = async (req, res, next) => {
+const masterOnly = async(req, res, next) => {
 	try {
 		const authHeader = req.headers.authorization;
-		if (!authHeader) {
+		if(!authHeader) {
 			return res.respond({
 				status: 401,
 				message: 'Unauthorized: Master token required.',
@@ -96,7 +96,7 @@ const masterOnly = async (req, res, next) => {
 		}
 
 		const token = authHeader.split(' ')[1];
-		if (!token) {
+		if(!token) {
 			return res.respond({
 				status: 401,
 				message: 'Unauthorized: Master token required.',
@@ -104,14 +104,14 @@ const masterOnly = async (req, res, next) => {
 		}
 
 		const masterToken = process.env.MASTER_TOKEN;
-		if (!masterToken) {
+		if(!masterToken) {
 			return res.respond({
 				status: 500,
 				message: 'Server Error: Master token not configured.',
 			});
 		}
 
-		if (token !== masterToken) {
+		if(token !== masterToken) {
 			return res.respond({
 				status: 403,
 				message: 'Forbidden: Invalid master token.',
@@ -122,18 +122,18 @@ const masterOnly = async (req, res, next) => {
 			payload: {
 				id: 'master',
 				role: 'master',
-				permissions: ['*'],
+				permissions: [ '*' ],
 				isMaster: true,
 			},
 			type: 'master'
 		};
 
-		if (process.env.LOG_MASTER_TOKEN_USAGE === 'true') {
-			console.info(`Master-only access for ${req.method} ${req.originalUrl} from IP: ${req.ip}`);
+		if(process.env.LOG_MASTER_TOKEN_USAGE === 'true') {
+			console.info(`Master-only access for ${ req.method } ${ req.originalUrl } from IP: ${ req.ip }`);
 		}
 
 		next();
-	} catch (e) {
+	} catch(e) {
 		res.respond({
 			status: 401,
 			message: 'Unauthorized: ' + e.message,
@@ -160,10 +160,10 @@ const isMasterToken = (req) => {
  * @returns {boolean} True if user has permission
  */
 const hasPermission = (req, permission) => {
-	if (!req.user || !req.user.payload) return false;
+	if(!req.user || !req.user.payload) return false;
 
 	// Master token has all permissions
-	if (isMasterToken(req)) return true;
+	if(isMasterToken(req)) return true;
 
 	// Check user permissions
 	const permissions = req.user.payload.permissions || [];
