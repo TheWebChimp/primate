@@ -676,7 +676,7 @@ class Primate {
 		});
 
 		return obj;
-	};
+	}
 
 	/**
 	 * Adds many-to-many relations to the model object.
@@ -706,7 +706,7 @@ class Primate {
 				}
 			}
 		});
-	};
+	}
 
 	/**
 	 * Creates a new Express router.
@@ -729,7 +729,7 @@ class Primate {
 		// Use custom router if provided, otherwise use the given router
 		const routeHandler = options.router || router;
 		PrimateService.prepareCrUDAGRoutes(controller, routeHandler, options);
-	};
+	}
 
 	/**
 	 * Adds one-to-many relations to the model object.
@@ -762,7 +762,7 @@ class Primate {
 				});
 			}
 		});
-	};
+	}
 }
 
 // export Primate class and instance

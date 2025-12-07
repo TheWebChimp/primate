@@ -127,7 +127,7 @@ const createApp = (options = {}) => {
 
 	// Request ID middleware for better tracing
 	app.use((req, res, next) => {
-		req.id = Math.random().toString(36).substr(2, 9);
+		req.id = Math.random().toString(36).slice(2, 11);
 		res.setHeader('X-Request-ID', req.id);
 		next();
 	});

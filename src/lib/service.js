@@ -916,11 +916,15 @@ class PrimateService {
 					}
 					// Handle range queries for numbers and dates
 					else if(value.includes('..')) {
-						const [ min, max ] = value.split('..');
+						const parts = value.split('..');
+						const min = parts[0];
+						const max = parts[1];
 						if(fieldType === 'Int' || fieldType === 'Float') {
+							const minNum = parseFloat(min);
+							const maxNum = parseFloat(max);
 							where[field] = {
-								gte: parseFloat(min) || undefined,
-								lte: parseFloat(max) || undefined,
+								gte: isNaN(minNum) ? undefined : minNum,
+								lte: isNaN(maxNum) ? undefined : maxNum,
 							};
 						} else if(fieldType === 'DateTime') {
 							const minDate = new Date(min);

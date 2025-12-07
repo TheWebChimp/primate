@@ -20,14 +20,15 @@ const auth = async(req, res, next) => {
 			});
 		}
 
-		// Extract the token from the Authorization header
-		const token = authHeader.split(' ')[1];
-		if(!token) {
+		// Extract the token from the Authorization header (expected format: "Bearer <token>")
+		const parts = authHeader.split(' ');
+		if(parts.length !== 2 || parts[0] !== 'Bearer') {
 			return res.respond({
 				status: 401,
-				message: 'Unauthorized: Please provide a valid token.',
+				message: 'Unauthorized: Invalid authorization format. Expected "Bearer <token>".',
 			});
 		}
+		const token = parts[1];
 
 		// Check if master token is provided and matches environment variable
 		const masterToken = process.env.MASTER_TOKEN;
@@ -60,17 +61,17 @@ const auth = async(req, res, next) => {
 
 	} catch(e) {
 		if(e.name === 'TokenExpiredError') {
-			res.respond({
+			return res.respond({
 				status: 401,
 				message: 'Unauthorized: Token has expired: ' + e.message,
 			});
 		} else if(e.name === 'JsonWebTokenError') {
-			res.respond({
+			return res.respond({
 				status: 401,
 				message: 'Unauthorized: Invalid token: ' + e.message,
 			});
 		} else {
-			res.respond({
+			return res.respond({
 				status: 401,
 				message: 'Unauthorized: ' + e.message,
 			});
@@ -95,13 +96,15 @@ const masterOnly = async(req, res, next) => {
 			});
 		}
 
-		const token = authHeader.split(' ')[1];
-		if(!token) {
+		// Extract the token from the Authorization header (expected format: "Bearer <token>")
+		const parts = authHeader.split(' ');
+		if(parts.length !== 2 || parts[0] !== 'Bearer') {
 			return res.respond({
 				status: 401,
-				message: 'Unauthorized: Master token required.',
+				message: 'Unauthorized: Invalid authorization format. Expected "Bearer <token>".',
 			});
 		}
+		const token = parts[1];
 
 		const masterToken = process.env.MASTER_TOKEN;
 		if(!masterToken) {
