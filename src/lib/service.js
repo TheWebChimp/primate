@@ -116,12 +116,13 @@ class PrimateService {
 	static async runHooks(event, context) {
 		if(!this.hooks[event] || this.hooks[event].length === 0) return;
 
+		const modelName = context.model || 'unknown';
 		for(const hook of this.hooks[event]) {
 			try {
 				await hook(context);
 			} catch(error) {
-				console.error(`Hook error in ${ event }:`, error);
-				throw new Error(`Hook execution failed: ${ error.message }`);
+				console.error(`Hook error in ${ event } for model "${ modelName }":`, error);
+				throw new Error(`Hook "${ event }" failed for model "${ modelName }": ${ error.message }`);
 			}
 		}
 	}
@@ -142,7 +143,8 @@ class PrimateService {
 
 		const normalizedModel = model[0].toLowerCase() + model.slice(1);
 		if(!this.orm[normalizedModel]) {
-			throw createError.NotFound(`Model "${ normalizedModel }" not found in ORM`);
+			const availableModels = Object.keys(this.orm).join(', ');
+			throw createError.NotFound(`Model "${ normalizedModel }" not found. Available models: ${ availableModels }`);
 		}
 
 		return normalizedModel;
@@ -322,7 +324,8 @@ class PrimateService {
 
 			// Handle specific Prisma errors
 			if(error.code === 'P2002') {
-				throw createError.Conflict(`${ model } with this data already exists`);
+				const field = error.meta?.target?.[0] || 'data';
+				throw createError.Conflict(`${ model } with this ${ field } already exists`);
 			}
 			if(error.code === 'P2003') {
 				throw createError.BadRequest('Foreign key constraint failed');
@@ -402,7 +405,8 @@ class PrimateService {
 				throw createError.NotFound(`${ model } not found`);
 			}
 			if(error.code === 'P2002') {
-				throw createError.Conflict(`${ model } with this data already exists`);
+				const field = error.meta?.target?.[0] || 'data';
+				throw createError.Conflict(`${ model } with this ${ field } already exists`);
 			}
 
 			throw createError.InternalServerError(`Failed to update ${ model }: ${ error.message }`);
@@ -623,13 +627,14 @@ class PrimateService {
 		const sanitized = {};
 
 		// Only include fields that exist in the model
+		const availableFields = Object.keys(modelObject).join(', ');
 		Object.entries(data).forEach(([ field, value ]) => {
 			if(modelObject.hasOwnProperty(field) || field === 'metas') {
 				sanitized[field] = value;
 			} else {
 				console.warn(
 					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
-					`Field "${ field }" not found in model "${ normalizedModel }"`,
+					`Field "${ field }" not found in model "${ normalizedModel }". Available fields: ${ availableFields }`,
 				);
 			}
 		});
@@ -986,6 +991,7 @@ class PrimateService {
 	static _buildSelectObject(model, selectFields) {
 		const modelFields = this.orm[model];
 		const select = {};
+		const availableFields = Object.keys(modelFields).join(', ');
 
 		const fields = typeof selectFields === 'string'
 			? selectFields.split(',').map(f => f.trim())
@@ -997,7 +1003,7 @@ class PrimateService {
 			} else {
 				console.warn(
 					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
-					`Field "${ field }" not found in model "${ model }"`,
+					`Field "${ field }" not found in model "${ model }". Available fields: ${ availableFields }`,
 				);
 			}
 		});
@@ -1022,7 +1028,13 @@ class PrimateService {
 			include = { ...include, ...query.include };
 		}
 
-		// Handle fetch-* parameters
+		// Handle new 'with' parameter (e.g., ?with=user,posts.comments,author(id,name))
+		if(query.with) {
+			const withInclude = this._parseWithParam(query.with);
+			include = this._deepMergeIncludes(include, withInclude);
+		}
+
+		// Handle fetch-* parameters (backward compatibility)
 		const fetchKeys = Object.keys(query)
 			.filter(key => key.startsWith('fetch-'))
 			.sort();
@@ -1040,10 +1052,137 @@ class PrimateService {
 				} else if(typeof value === 'string') {
 					include[entityCamel] = { include: { [value]: true } };
 				}
+			} else {
+				const availableRelations = Object.keys(modelFields).filter(f =>
+					typeof modelFields[f] !== 'string' || ![ 'Int', 'String', 'Boolean', 'DateTime', 'Float', 'Json' ].includes(modelFields[f]),
+				).join(', ');
+				console.warn(
+					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
+					`Relation "${ entityCamel }" not found on model "${ model }". Available relations: ${ availableRelations || 'none' }`,
+				);
 			}
 		});
 
 		return Object.keys(include).length > 0 ? include : undefined;
+	}
+
+	/**
+	 * Parse the 'with' query parameter into a Prisma include object
+	 * Supports:
+	 * - Simple: "user,posts" -> { user: true, posts: true }
+	 * - Nested: "user.profile,posts.comments" -> { user: { include: { profile: true } }, posts: { include: { comments: true } } }
+	 * - Field selection: "user(id,name)" -> { user: { select: { id: true, name: true } } }
+	 * - Combined: "user.profile(bio),posts.comments.author" -> nested with select
+	 * @private
+	 * @param {string} withParam - The 'with' query parameter value
+	 * @returns {Object} Prisma include object
+	 */
+	static _parseWithParam(withParam) {
+		if(!withParam || typeof withParam !== 'string') {
+			return {};
+		}
+
+		const include = {};
+		const relations = withParam.split(',').map(r => r.trim()).filter(Boolean);
+
+		relations.forEach(relation => {
+			// Validate syntax: only allow alphanumeric, dots, parentheses, and commas inside parens
+			if(!/^[\w.]+(\([\w,\s]+\))?$/.test(relation)) {
+				console.warn(
+					chalk.bgYellow.black.italic(' ⚠️ WARNING '),
+					`Invalid 'with' syntax: "${ relation }". Expected format: "relation", "relation.nested", or "relation(field1,field2)"`,
+				);
+				return;
+			}
+
+			// Parse field selection: "user(id,name)" or "user.profile(bio,avatar)"
+			const selectMatch = relation.match(/^(.+?)\(([^)]+)\)$/);
+			let path = relation;
+			let selectFields = null;
+
+			if(selectMatch) {
+				path = selectMatch[1];
+				selectFields = selectMatch[2].split(',').map(f => f.trim());
+			}
+
+			// Build nested include for path like "user.profile.settings"
+			const parts = path.split('.');
+			this._buildNestedInclude(include, parts, selectFields);
+		});
+
+		return include;
+	}
+
+	/**
+	 * Build nested include structure from path parts
+	 * @private
+	 * @param {Object} include - The include object to modify
+	 * @param {string[]} parts - Path parts (e.g., ['user', 'profile', 'settings'])
+	 * @param {string[]|null} selectFields - Fields to select at the leaf level
+	 */
+	static _buildNestedInclude(include, parts, selectFields = null) {
+		if(parts.length === 0) return;
+
+		const [ current, ...remaining ] = parts;
+		const currentCamel = changeCase.camelCase(current);
+
+		if(remaining.length === 0) {
+			// Leaf node - apply select if specified
+			if(selectFields && selectFields.length > 0) {
+				const select = {};
+				selectFields.forEach(field => {
+					select[field.trim()] = true;
+				});
+				include[currentCamel] = { select };
+			} else {
+				// Simple include
+				if(!include[currentCamel]) {
+					include[currentCamel] = true;
+				}
+			}
+		} else {
+			// Intermediate node - need nested include
+			if(!include[currentCamel] || include[currentCamel] === true) {
+				include[currentCamel] = { include: {} };
+			} else if(!include[currentCamel].include) {
+				include[currentCamel].include = {};
+			}
+			this._buildNestedInclude(include[currentCamel].include, remaining, selectFields);
+		}
+	}
+
+	/**
+	 * Deep merge two include objects
+	 * @private
+	 * @param {Object} target - Target include object
+	 * @param {Object} source - Source include object to merge
+	 * @returns {Object} Merged include object
+	 */
+	static _deepMergeIncludes(target, source) {
+		const result = { ...target };
+
+		Object.keys(source).forEach(key => {
+			if(result[key] === undefined) {
+				result[key] = source[key];
+			} else if(result[key] === true && typeof source[key] === 'object') {
+				// Upgrade from simple include to detailed include
+				result[key] = source[key];
+			} else if(typeof result[key] === 'object' && typeof source[key] === 'object') {
+				// Merge nested includes
+				if(result[key].include && source[key].include) {
+					result[key] = {
+						...result[key],
+						include: this._deepMergeIncludes(result[key].include, source[key].include),
+					};
+				} else if(source[key].include) {
+					result[key] = { ...result[key], include: source[key].include };
+				} else if(source[key].select) {
+					result[key] = { ...result[key], select: source[key].select };
+				}
+			}
+		});
+
+		return result;
 	}
 }
 

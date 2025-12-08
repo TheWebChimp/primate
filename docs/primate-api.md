@@ -19,6 +19,7 @@ List all records with pagination, sorting, search, and filtering.
 | `q` | string | - | Search term (searches queryableFields, aliases: filterFields, qFields) |
 | `count` | boolean | false | Return only count, no data |
 | `select` | string | - | Comma-separated fields to include |
+| `with` | string | - | Relations to include (supports nesting and field selection) |
 | `{field}` | any | - | Filter by exact field value |
 
 **Example Requests:**
@@ -43,6 +44,21 @@ GET /users?select=id,name,email
 
 # Count only
 GET /users?count=true
+
+# Include relations (simple)
+GET /posts?with=author,category
+
+# Include nested relations
+GET /posts?with=author.profile,comments.user
+
+# Include relations with field selection
+GET /posts?with=author(id,name,email),comments(content,createdAt)
+
+# Combined nested + field selection
+GET /posts?with=author.profile(bio,avatar),comments.user(name)
+
+# Deep nesting
+GET /posts?with=comments.user.profile
 ```
 
 **Response:**

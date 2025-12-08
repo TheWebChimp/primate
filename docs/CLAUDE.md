@@ -115,7 +115,23 @@ GET /users?q=john&status=active&role=admin
 | `q` | Search across queryableFields (aliases: filterFields, qFields) |
 | `count` | Return only count, no data |
 | `select` | Comma-separated fields to include |
+| `with` | Include relations (supports nesting and field selection) |
 | `{field}` | Filter by exact field value |
+
+### Include Relations (with parameter)
+```bash
+# Simple includes
+GET /posts?with=author,category
+
+# Nested includes
+GET /posts?with=author.profile,comments.user
+
+# Field selection
+GET /posts?with=author(id,name),comments(content)
+
+# Combined
+GET /posts?with=author.profile(bio),comments.user(name)
+```
 
 ## Response Format
 
