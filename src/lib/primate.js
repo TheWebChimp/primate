@@ -44,10 +44,36 @@ class Primate {
 	 * @constructor
 	 */
 	constructor(appConfig = {}) {
-		// Create the Express app with the improved configuration
+		// Store the initial app config for merging with setup() config later
+		this.appConfig = appConfig;
+		this.app = null;
+		this.hooks = {};
+		this.prisma = null;
+		this.orm = null;
+		this.settings = {};
+	}
+
+	/**
+	 * Initialize the Express app with configuration.
+	 * @param {Object} [appOptions={}] - App configuration options from setup().
+	 * @private
+	 */
+	_initializeApp(appOptions = {}) {
+		// Merge constructor config with setup() config
+		const mergedAppConfig = {
+			...this.appConfig,
+			...appOptions,
+			// Merge allowedHeaders arrays instead of replacing
+			allowedHeaders: [
+				'X-Primate-Version',
+				'X-Entity-Type',
+				...(this.appConfig.allowedHeaders || []),
+				...(appOptions.allowedHeaders || []),
+			],
+		};
+
 		this.app = createApp({
 			// Default Primate-specific configurations
-			allowedHeaders: [ 'X-Primate-Version', 'X-Entity-Type' ],
 			cors: {
 				credentials: true,
 				origin: process.env.CORS_ORIGIN || true,
@@ -88,17 +114,12 @@ class Primate {
 				// Add Primate-specific routes or middleware after standard setup
 				this.setupPrimateMiddleware(app);
 			},
-			// Merge with user-provided config
-			...appConfig,
+			// Merge with combined user config
+			...mergedAppConfig,
 		});
 
 		// Set static reference
 		Primate.app = this.app;
-
-		this.hooks = {};
-		this.prisma = null;
-		this.orm = null;
-		this.settings = {};
 	}
 
 	/**
@@ -134,8 +155,12 @@ class Primate {
 	/**
 	 * Use middleware in the express app.
 	 * @param  {...any} args - The middleware(s) to use.
+	 * @throws {Error} - If the app hasn't been initialized.
 	 */
 	use(...args) {
+		if(!this.app) {
+			throw new Error('App must be initialized before adding middleware. Call setup() first.');
+		}
 		this.app.use(...args);
 	}
 
@@ -143,8 +168,12 @@ class Primate {
 	 * Start the Primate application.
 	 * @param {string|number} [port=config.server.port] - The port to listen on.
 	 * @param {Function} [callback] - Optional callback function.
+	 * @throws {Error} - If the app hasn't been initialized.
 	 */
 	async start(port = config.server.port, callback) {
+		if(!this.app) {
+			throw new Error('App must be initialized before starting. Call setup() first.');
+		}
 
 		this.app.use('*', (req, res) => {
 			res.respond({
@@ -244,8 +273,12 @@ class Primate {
 	/**
 	 * Set up routes from a directory.
 	 * @param {string} [routesDir='./routes'] - The directory containing route files.
+	 * @throws {Error} - If the app hasn't been initialized.
 	 */
 	async routes(routesDir = './routes') {
+		if(!this.app) {
+			throw new Error('App must be initialized before setting up routes. Call setup() first.');
+		}
 		try {
 			console.info(chalk.blue(`Loading routes from ${ routesDir }...`));
 			const routes = await Primate.importRoutes(routesDir);
@@ -274,8 +307,12 @@ class Primate {
 			const prismaClientLocation = userConfig.prismaClientLocation || config.primate.prismaClientLocation;
 			const usePrisma = userConfig.usePrisma !== undefined ? userConfig.usePrisma : config.primate.enablePrisma;
 
-			this.settings = { ...this.settings, ...config.settings };
+			// Merge settings from config and userConfig
+			this.settings = { ...this.settings, ...config.settings, ...userConfig.settings };
 			Primate.settings = this.settings;
+
+			// Initialize the Express app with merged config from constructor and setup()
+			this._initializeApp(userConfig.app || {});
 
 			console.info(chalk.blue('🔧 Setting up Primate application...'));
 
