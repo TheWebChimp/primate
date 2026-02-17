@@ -58,6 +58,19 @@ router.get('/slug/:slug', async (req, res) => {
     }
 });
 
+// Custom endpoint: Get with related data using `with` parameter
+router.get('/with-details', async (req, res) => {
+    try {
+        const result = await PrimateService.all('product', {
+            ...req.query,
+            with: 'category,reviews.user(name)'
+        });
+        res.respond({ data: result.data, count: result.count });
+    } catch (error) {
+        res.respond({ status: 500, message: error.message });
+    }
+});
+
 // Custom endpoint: Bulk status update
 router.put('/bulk/status', auth, async (req, res) => {
     try {
@@ -74,41 +87,66 @@ router.put('/bulk/status', auth, async (req, res) => {
 export { router };
 ```
 
-## Service File Template (Basic)
+## Service File Template (Basic — All 10 Hooks)
 
 ```javascript
 // entities/{plural}/{singular}.service.js
 import { PrimateService } from '@thewebchimp/primate';
 
 class {ModelName}Service {
+    // --- Create hooks ---
     static async beforeCreate(data, options = {}) {
-        // Transform data before creation
+        // Transform or validate data before creation
         return data;
     }
 
     static async afterCreate(record, options = {}) {
-        // Post-process after creation
+        // Post-process after creation (e.g., send notifications)
         return record;
     }
 
+    // --- Update hooks ---
     static async beforeUpdate(data, options = {}) {
-        // Transform data before update
+        // Transform or validate data before update
         return data;
     }
 
     static async afterUpdate(record, options = {}) {
-        // Post-process after update
+        // Post-process after update (e.g., log changes)
         return record;
     }
 
-    static async afterGet(record, options = {}) {
-        // Filter/transform single record
+    // --- Delete hooks ---
+    static async beforeDelete(data, options = {}) {
+        // Check permissions, cascade cleanup, or prevent deletion
+        return data;
+    }
+
+    static async afterDelete(record, options = {}) {
+        // Cleanup related data, log deletion
         return record;
+    }
+
+    // --- List hooks ---
+    static async beforeAll(data, options = {}) {
+        // Modify query before fetching all records
+        return data;
     }
 
     static async afterAll(records, options = {}) {
         // Filter/transform multiple records
         return records;
+    }
+
+    // --- Get hooks ---
+    static async beforeGet(data, options = {}) {
+        // Modify query before fetching single record
+        return data;
+    }
+
+    static async afterGet(record, options = {}) {
+        // Filter/transform single record
+        return record;
     }
 }
 
@@ -210,6 +248,86 @@ class PostService {
 }
 
 export default PostService;
+```
+
+## Service File Template (With Computed Fields)
+
+```javascript
+// entities/members/member.service.js
+import { PrimateService } from '@thewebchimp/primate';
+
+class MemberService {
+    static async afterGet(record, options = {}) {
+        if (!record) return record;
+        record.displayName = `${record.firstName} ${record.lastName}`;
+        record.isExpired = record.expiresAt && new Date(record.expiresAt) < new Date();
+        return record;
+    }
+
+    static async afterAll(records, options = {}) {
+        return records.map(r => this.afterGet(r, options));
+    }
+}
+
+export default MemberService;
+```
+
+## Service File Template (With Soft Delete)
+
+```javascript
+// entities/posts/post.service.js
+import { PrimateService } from '@thewebchimp/primate';
+
+class PostService {
+    static async beforeDelete(data, options = {}) {
+        // Instead of hard-deleting, mark the record as deleted
+        await PrimateService.update('post', data.id, {
+            isDeleted: true,
+            deletedAt: new Date()
+        });
+        // Throw to abort the actual DELETE query
+        throw new Error('SOFT_DELETE');
+    }
+
+    static async beforeAll(data, options = {}) {
+        // Exclude soft-deleted records from list queries
+        data.where = { ...data.where, isDeleted: false };
+        return data;
+    }
+
+    static async beforeGet(data, options = {}) {
+        // Exclude soft-deleted records from single queries
+        data.where = { ...data.where, isDeleted: false };
+        return data;
+    }
+}
+
+export default PostService;
+```
+
+## Service File Template (With Dependency Check)
+
+```javascript
+// entities/categories/category.service.js
+import { PrimateService } from '@thewebchimp/primate';
+
+class CategoryService {
+    static async beforeDelete(data, options = {}) {
+        // Check for related records before allowing deletion
+        const relatedProducts = await PrimateService.all('product', {
+            where: { idCategory: data.id },
+            limit: 1
+        });
+
+        if (relatedProducts.data && relatedProducts.data.length > 0) {
+            throw new Error('Cannot delete category: it has associated products. Reassign or delete them first.');
+        }
+
+        return data;
+    }
+}
+
+export default CategoryService;
 ```
 
 ## Schema File Template (Basic)
