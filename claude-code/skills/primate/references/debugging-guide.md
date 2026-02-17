@@ -254,6 +254,8 @@ Where `{plural}` is the pluralized entity name and `{singular}` is the singular 
 - `entities/products/product.schema.js`
 - `entities/blog-posts/blog-post.schema.js`
 
+> **Note:** The `validateSchema` method in `primate.js` constructs the path using `pluralize(entity)` on the camelCase model name, which may produce different results for multi-word entities (e.g., `pluralize('blogPost')` → `blogPosts` not `blog-posts`). For multi-word entities, verify the actual path used by adding a console log or checking the warning message. Single-word entities are not affected.
+
 If the schema file does not exist, Primate logs a warning (`Schema file not found for entity "..."`) but **does not block the operation** -- data passes through without validation.
 
 ### Schema must be a Joi object

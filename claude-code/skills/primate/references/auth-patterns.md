@@ -102,7 +102,7 @@ router.post('/register', async (req, res) => {
 ## Get Current User Template
 
 ```javascript
-import auth from '@thewebchimp/primate';
+import { auth, PrimateService } from '@thewebchimp/primate';
 
 router.get('/me', auth, async (req, res) => {
     try {

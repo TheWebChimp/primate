@@ -92,7 +92,7 @@ Available static methods on `PrimateService`:
 | `get` | `get(model, id, options)` | Get a single record by ID |
 | `all` | `all(model, options)` | Get all records with filtering |
 | `findById` | `findById(model, id, options)` | Find a record by ID |
-| `findBy` | `findBy(model, field, value, options)` | Find records by field value |
+| `findBy` | `findBy(model, where, params)` | Find first record matching where object |
 | `updateMetas` | `updateMetas(model, id, metas)` | Update the metas JSON field |
 
 ---
@@ -218,8 +218,8 @@ Creates a complete entity -- Prisma model, router, and optionally service and sc
 3. **Suggest standard fields** that most entities benefit from. The user can accept or decline each:
    - `uid String @unique @default(uuid())` -- Public unique identifier
    - `metas Json? @default("{}")` -- Flexible metadata JSON field
-   - `createdAt DateTime @default(now()) @map("created_at")`
-   - `modifiedAt DateTime @updatedAt @map("modified_at")`
+   - `created DateTime @default(now())`
+   - `modified DateTime @default(now()) @updatedAt`
 
 4. **Detect relations.** If any field name starts with `id` followed by an uppercase letter (e.g., `idUser`, `idCategory`), automatically:
    - Add the FK field as `Int`
@@ -229,9 +229,9 @@ Creates a complete entity -- Prisma model, router, and optionally service and sc
 5. **Create the entity folder** at `entities/{kebab-plural}/`.
 
 6. **Write the router file** at `entities/{kebab-plural}/{kebab-plural}.js`:
-   - Import `PrimateController` from `@thewebchimp/primate`
-   - Create an Express router
-   - Call `Primate.setupRoute('{camelCase}', router)`
+   - Import `Primate` from `@thewebchimp/primate`
+   - Create an Express router via `Primate.getRouter()`
+   - Call `Primate.setupRoute('{camelCase}', router, options)`
    - Set `queryableFields` from any `String` type fields (for filtering via query params)
    - Set `searchField` to `slug` if a slug field exists, or `email` if an email field exists
    - Export the router
@@ -306,6 +306,8 @@ Creates a custom service file with lifecycle hooks for an entity.
 - Service hooks are automatically detected by Primate when the file follows the naming convention.
 - Available hook names: `beforeCreate`, `afterCreate`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`, `beforeGet`, `afterGet`, `beforeAll`, `afterAll`.
 - The `data` parameter contains the request body (for create/update) or the record (for get/delete).
+- If slug generation is selected, remind user: `yarn add slugify`
+- If password hashing is selected, remind user: `yarn add bcrypt`
 
 ---
 
@@ -485,16 +487,11 @@ Sets up JWT authentication routes and service hooks for an entity (typically Use
    - `POST /auth/login` -- Validate credentials, generate JWT, return token + user data
    - `POST /auth/register` -- Create user, hash password, generate JWT, return token + user data
    - `GET /auth/me` -- Protected route (requires `auth` middleware), return current user from JWT
-   - Use `jwt.sign()` and `jwt.verify()` from Primate exports
+   - Use `jwt.signAccessToken()` from Primate exports to generate tokens
    - Use `res.respond()` for all responses
    - Reference `references/auth-patterns.md` for the complete template
 
-5. **Remind the user** to load the auth routes in `index.js`:
-   ```js
-   // In the Primate.setup() callback or after Primate.start():
-   const authRoutes = require('./routes/auth');
-   app.use('/api/v1', authRoutes);
-   ```
+5. **Remind the user** to load the auth routes in `index.js`. The routes are loaded automatically if placed in the `routes/` directory and `primate.routes('./routes')` is called in setup. No manual import is needed.
 
 **Files Created/Modified:**
 
@@ -503,10 +500,11 @@ Sets up JWT authentication routes and service hooks for an entity (typically Use
 
 **Reminders:**
 
-- Make sure `JWT_SECRET` is set in `.env`.
-- Load `routes/auth.js` in `index.js`.
+- Make sure `ACCESS_TOKEN_SECRET` is set in `.env` (min 32 chars).
+- Install bcrypt: `yarn add bcrypt`
+- Routes in `routes/` are loaded automatically by `primate.routes('./routes')`.
 - The `auth` middleware can be imported from `@thewebchimp/primate` and used on any route.
-- Test with: `curl -X POST http://localhost:3000/api/v1/auth/login -H "Content-Type: application/json" -d '{"email":"...","password":"..."}'`
+- Test with: `curl -X POST http://localhost:3000/auth/login -H "Content-Type: application/json" -d '{"email":"...","password":"..."}'`
 - Reference `references/auth-patterns.md` for detailed JWT flow.
 
 ---
