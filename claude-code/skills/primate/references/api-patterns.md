@@ -1,6 +1,6 @@
 # API Patterns
 
-Complete reference for Primate API endpoints and query patterns.
+Complete reference for Primate API endpoints, query parameters, and response formats.
 
 ## Auto-Generated Endpoints (CRUDAG)
 
@@ -108,53 +108,200 @@ GET /products?q=widget&page=1&limit=10
 
 ### Field Filters
 
+Field filters are built by `_buildFieldFilters` in service.js. Any query parameter that matches a model field name (and is not a reserved parameter like `page`, `limit`, `by`, `order`, `q`, `with`, `select`, `count`) is treated as a field filter.
+
+#### Exact Match
+
 ```bash
-# Exact match
 GET /products?status=active
+```
 
-# Multiple values (IN)
+Prisma query: `{ where: { status: 'active' } }`
+
+#### Comma-Separated (IN filter)
+
+Values separated by commas produce a Prisma `in` clause:
+
+```bash
 GET /products?status=active,draft
+```
 
-# Range (numbers)
+Prisma query: `{ where: { status: { in: ['active', 'draft'] } } }`
+
+#### Pipe-Separated (has filter)
+
+Values separated by pipes produce a Prisma `has` clause (for array/JSON fields):
+
+```bash
+GET /products?tags=tech|science
+```
+
+Prisma query: `{ where: { tags: { has: ['tech', 'science'] } } }`
+
+#### Range Filter (gte/lte)
+
+Two values separated by `..` produce a range query with `gte` and `lte`:
+
+```bash
+# Numeric range
 GET /products?price=10..50
+```
 
-# Range (dates)
+Prisma query: `{ where: { price: { gte: 10, lte: 50 } } }`
+
+```bash
+# Date range
 GET /products?created=2024-01-01..2024-12-31
 ```
 
-### Field Selection
+Prisma query: `{ where: { created: { gte: '2024-01-01', lte: '2024-12-31' } } }`
+
+#### Combined Filters
+
+All filter types can be combined in a single request:
 
 ```bash
-# Select specific fields
-GET /products?select=id,name,price
-
-# Count only (no data)
-GET /products?count=true
+GET /products?status=active,draft&price=10..50&q=widget&page=1&limit=20
 ```
 
-### Relation Includes
+### Field Selection (select parameter)
+
+Use `select` to return only specific fields. Fields are comma-separated:
 
 ```bash
-# Simple include
-GET /posts?with=author
+GET /products?select=id,name,price
+```
 
-# Multiple includes
-GET /posts?with=author,comments
+Prisma query: `{ select: { id: true, name: true, price: true } }`
 
-# Nested includes
-GET /posts?with=author.profile
+This reduces response payload size when you only need certain columns.
+
+### Count Parameter
+
+Use `count=true` to get only the total count of matching records without returning actual data:
+
+```bash
+GET /products?count=true
+GET /products?status=active&count=true
+```
+
+Response:
+```json
+{
+  "result": "success",
+  "status": 200,
+  "message": "Products retrieved successfully",
+  "data": [],
+  "count": 150,
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "requestId": "abc123"
+}
+```
+
+### Relation Includes (with parameter)
+
+The `with` parameter includes related models in the response. It is parsed by `_parseWithParam` in service.js, which validates each entry against the regex `/^[\w.]+(\([\w,\s]+\))?$/` and converts names using `changeCase.camelCase`.
+
+#### Pattern 1: Simple Include
+
+Include one or more relations by name:
+
+```bash
+GET /posts?with=user
+GET /posts?with=user,comments
+```
+
+Prisma query:
+```javascript
+{ include: { user: true, comments: true } }
+```
+
+#### Pattern 2: Nested Include
+
+Use dot notation to include nested relations:
+
+```bash
+GET /posts?with=user.profile
 GET /posts?with=comments.author
+```
 
-# Include with field selection
-GET /posts?with=author(id,name)
-GET /posts?with=author(id,name),comments(content)
+Prisma query:
+```javascript
+// with=user.profile
+{
+  include: {
+    user: {
+      include: {
+        profile: true
+      }
+    }
+  }
+}
+```
 
-# Nested with field selection
-GET /posts?with=author.profile(bio,avatar)
+#### Pattern 3: Field Selection on Relations
+
+Use parentheses to select specific fields from a relation:
+
+```bash
+GET /posts?with=user(id,name)
+GET /posts?with=user(id,name),comments(content,created)
+```
+
+Prisma query:
+```javascript
+// with=user(id,name)
+{
+  include: {
+    user: {
+      select: {
+        id: true,
+        name: true
+      }
+    }
+  }
+}
+```
+
+#### Pattern 4: Nested Include with Field Selection
+
+Combine dot notation with parentheses for nested relations with field selection:
+
+```bash
+GET /posts?with=user.profile(bio)
+GET /posts?with=user.profile(bio,avatar)
 GET /posts?with=comments.author(name,email)
+```
 
-# Complex nested includes
-GET /posts?with=author.profile,comments.author.profile
+Prisma query:
+```javascript
+// with=user.profile(bio)
+{
+  include: {
+    user: {
+      include: {
+        profile: {
+          select: {
+            bio: true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### Complex Combined Examples
+
+```bash
+# Multiple relations with different patterns
+GET /posts?with=user.profile,comments.author.profile
+
+# Mixed simple and nested with field selection
+GET /posts?with=user(id,name),comments.author(name,email)
+
+# Deep nesting
+GET /posts?with=comments.author.profile(bio,avatar)
 ```
 
 ### Legacy Fetch Parameters
@@ -168,6 +315,8 @@ GET /posts?fetch-comments=author
 ```
 
 ## Response Format
+
+All endpoints return standardized JSON via `res.respond()`.
 
 ### Success Response (Single)
 
@@ -199,14 +348,15 @@ GET /posts?fetch-comments=author
   "status": 200,
   "message": "Products retrieved successfully",
   "data": [
-    { "id": 1, "name": "Widget A", ... },
-    { "id": 2, "name": "Widget B", ... }
+    { "id": 1, "name": "Widget A", "price": 29.99 },
+    { "id": 2, "name": "Widget B", "price": 19.99 }
   ],
   "count": 150,
   "meta": {
     "page": 1,
     "limit": 20,
-    "totalPages": 8
+    "totalPages": 8,
+    "responseTime": "45ms"
   },
   "timestamp": "2024-01-01T12:00:00.000Z",
   "requestId": "abc123"
@@ -230,6 +380,24 @@ GET /posts?fetch-comments=author
   "requestId": "abc123"
 }
 ```
+
+### Response Fields Reference
+
+| Field | Type | Present | Description |
+|-------|------|---------|-------------|
+| `result` | string | Always | `"success"` or `"error"` |
+| `status` | number | Always | HTTP status code |
+| `message` | string | Always | Human-readable description |
+| `data` | object/array | Success | Record(s) returned |
+| `count` | number | List endpoints | Total matching records |
+| `meta` | object | List endpoints | Pagination metadata |
+| `meta.page` | number | List endpoints | Current page number |
+| `meta.limit` | number | List endpoints | Records per page |
+| `meta.totalPages` | number | List endpoints | Total number of pages |
+| `meta.responseTime` | string | List endpoints | Server processing time |
+| `errors` | array | Error | Validation error details |
+| `timestamp` | string | Always | ISO 8601 timestamp |
+| `requestId` | string | Always | Unique request identifier for tracing |
 
 ### Common Error Codes
 
@@ -287,6 +455,10 @@ req.user = {
 ### Public Endpoint
 
 ```javascript
+import { Primate, PrimateService } from '@thewebchimp/primate';
+
+const router = Primate.getRouter();
+
 router.get('/public/featured', async (req, res) => {
   const products = await PrimateService.all('product', {
     ...req.query,
@@ -300,7 +472,9 @@ router.get('/public/featured', async (req, res) => {
 ### Protected Endpoint
 
 ```javascript
-import { auth } from '@thewebchimp/primate';
+import { Primate, PrimateService, auth } from '@thewebchimp/primate';
+
+const router = Primate.getRouter();
 
 router.get('/my/orders', auth, async (req, res) => {
   const orders = await PrimateService.all('order', {
@@ -315,10 +489,14 @@ router.get('/my/orders', auth, async (req, res) => {
 ### Master-Only Endpoint
 
 ```javascript
-import { masterOnly } from '@thewebchimp/primate';
+import { Primate } from '@thewebchimp/primate';
+import { masterOnly } from '@thewebchimp/primate/src/middlewares/auth.js';
+
+const router = Primate.getRouter();
 
 router.delete('/admin/purge', masterOnly, async (req, res) => {
   // Dangerous operation only for master token
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   await prisma.log.deleteMany({
     where: { created: { lt: thirtyDaysAgo } }
   });
@@ -329,7 +507,10 @@ router.delete('/admin/purge', masterOnly, async (req, res) => {
 ### Permission-Based Endpoint
 
 ```javascript
-import { auth, hasPermission } from '@thewebchimp/primate';
+import { Primate, PrimateService, auth } from '@thewebchimp/primate';
+import { hasPermission } from '@thewebchimp/primate/src/middlewares/auth.js';
+
+const router = Primate.getRouter();
 
 router.post('/posts/:id/publish', auth, async (req, res) => {
   if (!hasPermission(req, 'publish')) {
@@ -339,6 +520,33 @@ router.post('/posts/:id/publish', auth, async (req, res) => {
   const post = await PrimateService.update('post', req.params.id, {
     status: 'published',
     publishedAt: new Date()
+  });
+  res.respond({ data: post });
+});
+```
+
+### Combined Master and Permission Check
+
+```javascript
+import { Primate, PrimateService, auth } from '@thewebchimp/primate';
+import { masterOnly, hasPermission } from '@thewebchimp/primate/src/middlewares/auth.js';
+
+const router = Primate.getRouter();
+
+// Route that requires master token
+router.post('/admin/reset-all', masterOnly, async (req, res) => {
+  // Only master token can access
+  res.respond({ message: 'Reset complete' });
+});
+
+// Route that checks a specific permission
+router.put('/posts/:id/feature', auth, async (req, res) => {
+  if (!hasPermission(req, 'feature_posts')) {
+    return res.respond({ status: 403, message: 'Feature permission required' });
+  }
+
+  const post = await PrimateService.update('post', req.params.id, {
+    featured: true
   });
   res.respond({ data: post });
 });
