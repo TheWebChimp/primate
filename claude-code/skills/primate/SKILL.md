@@ -13,10 +13,10 @@ description: Comprehensive Primate framework skill — scaffolding, debugging, a
 
 ```js
 // Core framework
-const { Primate, PrimateService, PrimateController, auth, jwt } = require('@thewebchimp/primate');
+import { Primate, PrimateService, PrimateController, auth, jwt } from '@thewebchimp/primate';
 
-// Auth middleware (from auth module)
-const { masterOnly, isMasterToken, hasPermission } = require('@thewebchimp/primate/auth');
+// Auth middleware (additional named exports)
+import { masterOnly, isMasterToken, hasPermission } from '@thewebchimp/primate/src/middlewares/auth.js';
 ```
 
 ### Entity Auto-Discovery
@@ -31,7 +31,23 @@ entities/
     {singular}.schema.js     # Joi validation schema (optional)
 ```
 
-The router file must call `PrimateController.setupRoute('{camelCaseSingular}', router)` to register the standard CRUDAG endpoints.
+The router file must call `Primate.setupRoute('{camelCaseSingular}', router, options)` to register the standard CRUDAG endpoints.
+
+### setupRoute Options
+
+`Primate.setupRoute(model, router, options)` accepts these options:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `searchField` | `string[]` | Fields to search when ID is non-numeric (e.g., slug, username) |
+| `queryableFields` | `string[]` | Fields searchable via `?q=` parameter |
+| `disableAuth` | `boolean` | Disable auth for ALL endpoints |
+| `disableCreateAuth` | `boolean` | Disable auth for `POST /` |
+| `disableAllAuth` | `boolean` | Disable auth for `GET /` |
+| `disableGetAuth` | `boolean` | Disable auth for `GET /:id` |
+| `disableUpdateAuth` | `boolean` | Disable auth for `PUT /:id` |
+| `disableDeleteAuth` | `boolean` | Disable auth for `DELETE /:id` |
+| `disableMetasAuth` | `boolean` | Disable auth for `PUT /:id/metas` |
 
 ### Standardized Responses -- res.respond()
 
@@ -215,7 +231,7 @@ Creates a complete entity -- Prisma model, router, and optionally service and sc
 6. **Write the router file** at `entities/{kebab-plural}/{kebab-plural}.js`:
    - Import `PrimateController` from `@thewebchimp/primate`
    - Create an Express router
-   - Call `PrimateController.setupRoute('{camelCase}', router)`
+   - Call `Primate.setupRoute('{camelCase}', router)`
    - Set `queryableFields` from any `String` type fields (for filtering via query params)
    - Set `searchField` to `slug` if a slug field exists, or `email` if an email field exists
    - Export the router
@@ -426,7 +442,7 @@ Adds a custom endpoint to an existing entity's router file.
    - Use `res.respond()` for the response
    - Apply auth middleware if specified: `auth` or `masterOnly`
 
-5. **Insert the endpoint** into the router file AFTER the `PrimateController.setupRoute()` call. Custom endpoints must come after the setupRoute call to avoid being overridden.
+5. **Insert the endpoint** into the router file AFTER the `Primate.setupRoute()` call. Custom endpoints must come after the setupRoute call to avoid being overridden.
 
 6. **Add any missing imports** at the top of the file (e.g., `PrimateService`, `auth`, `masterOnly`).
 
