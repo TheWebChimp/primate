@@ -26,6 +26,26 @@ model {ModelName} {
 }
 ```
 
+> **IMPORTANT: Foreign Key Naming Convention**
+>
+> Primate's ORM detection in `primate.js:addOneToManyRelations` looks for foreign key fields named **`id{OtherModelPascalCase}`** — for example: `idUser`, `idPost`, `idCategory`.
+>
+> This is **NOT** `userId` or `user_id`. It **MUST** be `id{PascalCase}`.
+>
+> ```prisma
+> // CORRECT — Primate will auto-detect these relations
+> idUser     Int
+> idPost     Int
+> idCategory Int
+>
+> // WRONG — Primate will NOT detect these
+> userId     Int   // ❌ camelCase suffix
+> user_id    Int   // ❌ snake_case
+> fk_user    Int   // ❌ prefix style
+> ```
+>
+> This convention applies to all foreign keys, including junction tables (`idPost`, `idTag`) and self-referential relations (`idParent`).
+
 ## Field Types
 
 ### String Fields
@@ -471,6 +491,48 @@ model OrderItem {
 }
 ```
 
+### Configuration/Setting Model
+
+```prisma
+model Setting {
+  id       Int      @id @default(autoincrement())
+  key      String   @unique
+  value    String   @db.Text
+  type     String   @default("string")
+  group    String   @default("general")
+  metas    Json?    @default("{}")
+  created  DateTime @default(now())
+  modified DateTime @default(now()) @updatedAt
+
+  @@index([group])
+  @@map("setting")
+}
+```
+
+### File/Media Model
+
+```prisma
+model Media {
+  id           Int      @id @default(autoincrement())
+  uid          String   @unique @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  path         String
+  url          String?
+  idUser       Int?
+  user         User?    @relation(fields: [idUser], references: [id])
+  metas        Json?    @default("{}")
+  created      DateTime @default(now())
+  modified     DateTime @default(now()) @updatedAt
+
+  @@index([idUser])
+  @@index([mimeType])
+  @@map("media")
+}
+```
+
 ## MySQL-Specific Annotations
 
 ```prisma
@@ -514,7 +576,7 @@ model Post {
 
 Usage in service:
 ```javascript
-// Soft delete
+// Soft delete a record
 await PrimateService.update('post', id, {
   isDeleted: true,
   deletedAt: new Date()
@@ -524,4 +586,22 @@ await PrimateService.update('post', id, {
 const posts = await PrimateService.all('post', query, {
   where: { isDeleted: false }
 });
+```
+
+Automatic filtering via service hook — add this to your entity's service file so all queries exclude soft-deleted records by default:
+```javascript
+// In post.service.js — filter out soft-deleted records automatically
+class PostService {
+    static async beforeAll(data, options = {}) {
+        options.where = { ...options.where, isDeleted: false };
+        return data;
+    }
+
+    static async beforeGet(data, options = {}) {
+        options.where = { ...options.where, isDeleted: false };
+        return data;
+    }
+}
+
+export default PostService;
 ```
