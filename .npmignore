@@ -1,0 +1,34 @@
+# Development directories
+.claude/
+.github/
+.idea/
+.playground/
+.generated/
+claude-code/
+docs/
+retype/
+node_modules/
+embeddings/
+
+# Development files
+retype.yml
+yarn.lock
+package-lock.json
+.gitignore
+.eslintcache
+
+# Environment and secrets
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Test and coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build artifacts
+*.tgz
